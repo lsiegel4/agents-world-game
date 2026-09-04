@@ -109,6 +109,7 @@ class World:
     nodes: list = field(default_factory=list)
     agents: list = field(default_factory=list)
     tick: int = 0
+    last_disaster: int = 0
 
     def node_by_id(self, node_id: str):
         for n in self.nodes:

@@ -6,7 +6,7 @@ randomness; agents are always processed in list order.
 
 import random
 
-from . import actions, indices
+from . import actions, deck, indices
 from .genesis import BASELINE_DRIVES, make_world
 from .log import EventLog
 from .state import (
@@ -26,6 +26,8 @@ DEFAULT_CONFIG = {
     "regen_rate": 0.025,
     "start_food": 6,
     "founder_max_age": 140,
+    "deck": True,          # set False for the §7.3 no-deck ablation arm
+    "deck_scale": 1.0,
     "snapshot_every": 25,
 }
 
@@ -77,7 +79,7 @@ def apply(world: World, agent, verb: str, params: dict, rng, log) -> None:
         actions.idle(world, agent, log)
 
 
-def step(world: World, rng, log) -> None:
+def step(world: World, rng, log, deck_rng=None, cfg=None) -> None:
     from . import brain
     world.tick += 1
 
@@ -100,6 +102,9 @@ def step(world: World, rng, log) -> None:
     for node in world.nodes:
         node.regenerate()
 
+    if deck_rng is not None and cfg and cfg.get("deck", True):
+        deck.draw(world, deck_rng, log, cfg.get("deck_scale", 1.0))
+
     if world.tick % DEFAULT_CONFIG["snapshot_every"] == 0:
         log.emit(world.tick, "indices", **indices.snapshot(world))
 
@@ -112,11 +117,18 @@ def run(seed: int, ticks: int, config: dict = None):
 
     log = EventLog()
     log.header(seed, cfg)
+    log.records[0]["deck"] = [
+        {"event": name, "base_p": base} for name, base, _, _ in deck.DECK
+    ]
     world = make_world(seed, cfg)
-    rng = random.Random(seed ^ 0x5EED)   # separate stream from worldgen
+    # Separate streams: worldgen, agent cognition, and the deck each draw from
+    # their own PRNG, so changing deck parameters does not reshuffle the jitter
+    # in every agent's decision and vice versa. Ablations stay comparable.
+    rng = random.Random(seed ^ 0x5EED)
+    deck_rng = random.Random(seed ^ 0xDECC)
 
     for _ in range(ticks):
-        step(world, rng, log)
+        step(world, rng, log, deck_rng, cfg)
         if not world.living_agents():
             log.emit(world.tick, "extinction")
             break

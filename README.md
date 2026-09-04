@@ -3,9 +3,16 @@
 Headless simulation of a world of agents with private, heterogeneous goals.
 Design: [DESIGN.md](DESIGN.md). Spectator mockup: `mockup/spectator.html`.
 
-**Status: M0 walking skeleton.** No LLM anywhere. Every agent runs on utility AI
-over its drive vector — this is the permanent non-LLM control arm from §7.5, not
-a placeholder to be replaced.
+**Status: M0 complete**, plus the §4.5 event deck pulled forward. No LLM anywhere.
+Every agent runs on utility AI over its drive vector — this is the permanent non-LLM
+control arm from §7.5, not a placeholder to be replaced. M1 (cognition) has not
+started.
+
+M0 asked one question: **does the economy produce non-degenerate outcomes with no
+cognition at all?** Answered yes. Population self-regulates (mean 5.9, range 0–15,
+sd 4.2 across 20 seeds), action entropy holds at 0.77, deck probabilities swing 7× on
+world state, and outcomes diverge widely by seed. Extinction is reachable — 4/20 seeds
+at t=2000, 8/20 at t=8000 — and that is left in deliberately; see the gate note below.
 
 ## Run
 
@@ -26,6 +33,7 @@ No dependencies. Python 3.9+.
 | `world/genesis.py` | M0 world generation stub (§4.1's nine passes arrive in M3) |
 | `world/brain.py` | Tier 0 utility AI — scores candidates from drives, no model call |
 | `world/actions.py` | `move` `work` `eat` `repair` (of the 12 in §5.5) |
+| `world/deck.py` | Event deck — state-weighted draws, mixed valence, non-starvation death |
 | `world/sim.py` | Tick loop, drive dynamics, starvation |
 | `world/log.py` | Append-only JSONL event log, SHA-256 digest |
 | `world/indices.py` | Population only; the §7.1 vector arrives in M2 |
@@ -93,9 +101,87 @@ bounded across horizons — mean 6.05 at t=2000, 7.80 at t=4000, 7.10 at t=8000,
 2–18, zero extinctions — and outcomes vary widely by seed: entropy 0.60–0.88, terminal
 node stock 15–78%, degradation 0.18–0.68.
 
-**Known limit.** Starvation is currently the only cause of death, which is precisely why
-the system is bistable: population is a pure feedback loop on the commons with nothing to
-dampen it. The event deck (§4.5) carries sickness, disaster and injury as
-resource-independent mortality and lands in M1. Note also that the tool schema has no
-verb for violence or theft — see the open question added to §12, which affects what the
-norm-compliance index can mean.
+## The event deck
+
+Six events (§4.5), each with a base probability and a weight function of world state,
+rolled independently every tick. Sickness follows density, frost follows overharvest,
+a good cut follows a healthy commons, findings follow exploration. Every draw logs the
+probability it fired at, so the deck is auditable — §7.5's threat #3 is that the deck's
+weighting is a designer's theory of causation smuggled in as randomness, and the answer
+is to publish it.
+
+Probabilities move substantially with state: over one 2000-tick run, fever ranged
+0.0020–0.0140 at the moment of draw, a 7× swing driven by density alone.
+
+Mortality is no longer monotype — 48 starvations, 9 fevers, 3 injuries in that run.
+Set `deck: False` in the config for the §7.3 no-deck ablation arm. The deck draws from
+its own PRNG stream, so changing deck parameters does not reshuffle the jitter in agent
+decisions; ablations stay comparable.
+
+### Ablation: what the deck actually does
+
+I predicted the deck would fix the bistability. It does not. Measured, 10 seeds each:
+
+```
+  regen   deck  meanpop  extinct
+  0.012  False     0.00   10/10
+  0.012   True     0.00   10/10      <- below threshold, deck cannot rescue
+  0.016  False     0.10    9/10
+  0.016   True     1.60    7/10
+  0.020  False     0.00   10/10
+  0.020   True     3.40    5/10      <- deck rescues marginal worlds
+  0.025  False     5.40    0/10
+  0.025   True     5.20    3/10      <- deck kills comfortable ones
+```
+
+The deck **converts the cliff into a gradient**, and it cuts both ways: `good_cut` and
+`finding` rescue worlds that would have collapsed, while `fever`, `injury` and `storm`
+kill worlds that would have held. It does not make worlds safer; it makes outcomes
+depend on luck. That is §2.2 working as specified, and it is a different claim from the
+one I made before measuring it.
+
+Default `regen_rate` is 0.025 — the last value chosen by a viability sweep rather than
+to satisfy a gate criterion. See below for why that distinction ended up mattering.
+
+## Why the gate was retired
+
+The gate earned its keep once, decisively, in run 1: it caught a world where 89% of all
+actions were `work` and every seed reached an identical terminal state. It has given
+diminishing returns since, and by the end it was failing outcomes the design explicitly
+wants reachable — a world going extinct at t=4000, a world stripping its commons, both
+named in §7.6 as phenomena worth studying.
+
+Two structural problems, recorded rather than patched:
+
+**1. The criteria are per-seed; the degeneracy they were built to catch is
+distributional.** Run 1's real signature was that mean node stock was 44.6% in *all
+twenty seeds* — identical. Each seed passed a "stock off floor and ceiling" check on its
+own. Per-seed criteria are blind to the exact failure mode they exist to detect. Only
+across-seed variance sees it.
+
+**2. Entropy has stopped discriminating.** Measured at t=2000, 20 seeds:
+
+```
+                              entropy        stock sd    extinct
+default   (regen 0.025)       0.772 ±0.04      0.215      4/20
+below cliff (regen 0.012)     0.786 ±0.04      0.198     19/20
+glut      (regen 0.120)       0.723 ±0.01      0.119      0/20
+```
+
+Entropy reads the same in a living world and in one where 19 of 20 seeds die. It now
+measures that agents did varied things before dying. Stock spread barely separates them
+either. Population is the only criterion still carrying information.
+
+**The deeper lesson, which cost three parameter changes to learn.** Of the changes made
+to the world this milestone, exactly one was a modeling fix: shelter upkeep, because
+`work` had no cost and wood had no use, so the world had a single attractor and
+randomness was inert. The three `regen_rate` moves (0.012 → 0.025 → 0.030 → 0.025) were
+not fixes — each was made to satisfy a criterion. That is tuning the world to fit the
+instrument, it pushes the world toward one where collapse cannot happen, and it
+invalidates every prior run. Real indices are M2's job; the gate should not have been
+asked to stand in for them.
+
+`gate.py` is kept as-is, unmodified, as the record of what M0 actually tested.
+
+**Known limit.** The tool schema still has no verb for violence or theft — see the open
+question in §12, which governs what the norm-compliance index can mean.

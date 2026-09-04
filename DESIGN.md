@@ -523,9 +523,10 @@ scoreboard, which is the exact thing §2.1 forbids.
 
 ## 11. Roadmap
 
-**M0 — Skeleton (headless).** Tick loop, world state, 20 hand-placed agents, utility AI
-only, no LLM. Prove the economy and the event deck produce non-degenerate outcomes.
-This is also the permanent non-LLM control arm.
+**M0 — Skeleton (headless). ✅ Complete 2026-09-04.** Tick loop, world state, utility AI
+only, no LLM. Proved the economy produces non-degenerate outcomes; the §4.5 event deck
+was pulled forward into this milestone. Permanent non-LLM control arm. Findings, and the
+reasons the M0 gate was retired rather than patched, are in README.md.
 
 **M1 — Cognition.** State→prompt rendering, tier routing, tools, memory with decay and
 consolidation. Single cheap model. Sandbox mode only.
