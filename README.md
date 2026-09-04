@@ -3,8 +3,9 @@
 Headless simulation of a world of agents with private, heterogeneous goals.
 Design: [DESIGN.md](DESIGN.md). Spectator mockup: `mockup/spectator.html`.
 
-**Status: M0 and M2 complete**, plus the §4.5 event deck, the T0 violence baseline, and
-the M1 cognition layer (built and tested; not yet run against a live model).
+**Status: M0 and M2 complete.** M1 slice 1 (cognition machinery) and slice 2 (social
+verbs) built; one live recording run done for $0.41. Nine of the ten §7.1 indices now
+compute — only `goal_attainment` is outstanding.
 Every agent runs on utility AI over its drive vector — this is the permanent non-LLM
 control arm from §7.5, not a placeholder to be replaced. M1 (cognition) has not
 started.
@@ -35,6 +36,7 @@ No dependencies. Python 3.9+.
 | `world/brain.py` | Tier 0 utility AI — scores candidates from drives, no model call |
 | `world/actions.py` | `move` `work` `eat` `repair` (of the 12 in §5.5) |
 | `world/deck.py` | Event deck — state-weighted draws, mixed valence, non-starvation death |
+| `world/knowledge.py` | Technique graph, discovery, transmission (§7.1 depth/breadth) |
 | `world/memory.py` | Episodic memory: salience, decay, ranked recall (§5.4) |
 | `world/prompt.py` | State -> prompt rendering and the API tool schema (§5.2) |
 | `world/cognition.py` | Stakes scoring, tier routing, model-driven action choice (§5.7) |
@@ -399,3 +401,78 @@ A related accounting bug is worth recording: fallbacks were counted as Tier 0 de
 so the report showed **0% escalation while 228 escalations had fired**. A fallback still
 rendered a prompt and still would have cost money on a live run. Attempts are counted
 before the call now.
+
+
+## M1 slice 2 — the social verbs
+
+`give`, `teach`, `form_bond`, `speak`, `leave_message`, `coerce` are in, at Tier 0 and in
+the LLM tool schema. Fourteen verbs total. This is what closed most of `UNAVAILABLE`:
+`knowledge_depth`, `knowledge_breadth`, `institution_density` and `reciprocity` are all
+measured now, and the behavioural profile carries `giving_rate`, `teaching_rate`,
+`information_sharing_rate` and `coalition_participation`.
+
+**Knowledge is a shallow dependency graph** (`world/knowledge.py`): `gleaning` and
+`coppicing` at depth 1, `drying` and `joinery` at depth 2, `kiln` at depth 3 needing both.
+Techniques raise harvest yield, meal value, and repair value. Discovery is rare and
+curiosity-weighted; transmission is `teach`. Depth 3 is deliberately out of reach for a
+single agent working alone in one lifetime, so a world that gets there got there by
+teaching.
+
+### The `teach` ablation — 20 seeds, 2000 ticks
+
+The study §11 named as the first one, finally runnable:
+
+```
+             population   depth   breadth   total harvested   extinct
+teach ON          11.40    2.85      8.38              5378      1/20
+teach OFF          6.05    1.25      1.10              4294      3/20
+```
+
+Teaching nearly doubles population, triples knowledge depth, and cuts extinction. It is
+the strongest single lever measured so far — a first answer to design question 1.
+
+**The per-capita trap, caught a second time.** Output *per capita* reads 385 with teaching
+and 738 without, which says teaching halves productivity. It does not. Total extraction
+rises 25% (5378 vs 4294) while population rises 88%, so the per-capita ratio falls because
+the denominator grew. `material_output_total` is now reported alongside, and the
+docstring on `material_output` carries this case as the warning.
+
+### Reciprocity could not bootstrap
+
+`give` fired **zero** times in 2000 ticks and 170 of 173 bond offers were refused. Both
+utilities were scored on existing standing — but standing is *created* by giving. You
+needed regard to be generous, and generosity was what earned regard, so neither ever
+started. Both now have a floor independent of standing, and a test guards it. After the
+fix: institutions 1.05 per world, reciprocity 0.24, and `give` fires.
+
+### What predicts a long life, with social strategies in the model
+
+12 seeds x 3000 ticks, 1056 agents, R2 = 0.29:
+
+```
+  policy             0.5743  ######################
+  luck               0.4416  #################
+  endowment          0.1150  ####
+
+  coalition_participation  -0.2187   bonding correlates with dying sooner
+  move_share               -0.1174
+  giving_rate              -0.0965   generosity is individually costly
+  teaching_rate            +0.0735   teaching is individually cheap and pays
+```
+
+Policy overtakes luck once social strategies enter the model, which is what you would
+hope. The signs are the interesting part: **teaching helps the teacher and the world;
+giving and bonding cost the individual while helping the world.** That is the non-zero-sum
+structure §2.1 asks for, appearing without being designed in.
+
+Read the coalition figure cautiously — bonding requires proximity, and proximity is also
+where violence happens, so it may partly proxy for exposure rather than cause harm.
+
+### Two more unbounded-string bugs
+
+Agent names compounded a patronymic every generation —
+`Bastianssonssonssonssonssonsson` — the same class of bug as the child ids, and it costs
+prompt tokens once rendered. Fixed. And `oldest agent: 1239 ticks` surfaced a real gap:
+§4.3 says agents age and die, but **no mortality is attached to age at all**. A third
+generation sharing the world with its founders is not a succession, which matters for the
+§7.6 lock-in test. Logged in §12 next to the archetype work.

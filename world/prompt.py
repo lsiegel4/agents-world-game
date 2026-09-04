@@ -45,10 +45,13 @@ def _self_state(agent) -> str:
                    "very hungry" if hunger < 0.8 else "starving")
     shelter_word = ("sound" if agent.shelter > 0.7 else
                     "worn" if agent.shelter > 0.35 else "failing")
+    known = (", ".join(sorted(agent.techniques)) if agent.techniques
+             else "nothing in particular")
     return (f"You are {agent.name}, aged {agent.age}. You are {hunger_word}. "
             f"Your shelter is {shelter_word}. "
             f"You carry {agent.has(FOOD):.0f} food and {agent.has(WOOD):.0f} wood "
-            f"(you cannot carry more than {MAX_CARRY:.0f} of either).")
+            f"(you cannot carry more than {MAX_CARRY:.0f} of either). "
+            f"You know how to do: {known}.")
 
 
 def _observation(world, agent, nearby_agents, nearby_nodes) -> str:
@@ -70,10 +73,13 @@ def _observation(world, agent, nearby_agents, nearby_nodes) -> str:
             # Only what is observable from outside. Never another agent's
             # drives, goal, hunger, or exact holdings.
             carrying = "carrying something" if other.has(FOOD) > 0 else "empty-handed"
-            grudge = agent.grudge_against(other.id)
             history = ""
-            if grudge >= 1.0:
+            if agent.grudge_against(other.id) >= 1.0:
                 history = " — this one has wronged you"
+            elif agent.favor_from(other.id) >= 1.0:
+                history = " — this one has been good to you"
+            if other.id in agent.bonds:
+                history += " — you are bound to this one"
             lines.append(f"  {other.id} ({other.name}), {carrying}{history}")
     else:
         lines.append("Nobody is within reach of you.")
@@ -147,6 +153,20 @@ def tool_schema(allow_violence: bool = True) -> list:
         _tool("repair", "Spend one wood mending your shelter."),
         _tool("reproduce", "Have a child. Costs food, and you must be fed and sheltered."),
         _tool("idle", "Do nothing this turn."),
+        _tool("give", "Hand food or wood to someone within reach.",
+              {"target_id": {"type": "string", "description": "id of the person"},
+               "resource": {"type": "string", "enum": ["food", "wood"]}},
+              ["target_id", "resource"]),
+        _tool("teach", "Show someone within reach how to do something you know.",
+              {"target_id": {"type": "string", "description": "id of the person"}},
+              ["target_id"]),
+        _tool("form_bond", "Offer to tie yourself to someone. They may refuse.",
+              {"target_id": {"type": "string", "description": "id of the person"}},
+              ["target_id"]),
+        _tool("speak", "Tell someone within reach what you know about a third person.",
+              {"target_id": {"type": "string", "description": "id of the person"}},
+              ["target_id"]),
+        _tool("leave_message", "Leave word here for whoever passes, even after you die."),
     ]
     if allow_violence:
         tools += [
@@ -154,6 +174,9 @@ def tool_schema(allow_violence: bool = True) -> list:
                   {"target_id": {"type": "string", "description": "id of the person"}},
                   ["target_id"]),
             _tool("harm", "Attack someone within reach. This sometimes kills.",
+                  {"target_id": {"type": "string", "description": "id of the person"}},
+                  ["target_id"]),
+            _tool("coerce", "Demand food from someone within reach, under threat.",
                   {"target_id": {"type": "string", "description": "id of the person"}},
                   ["target_id"]),
         ]

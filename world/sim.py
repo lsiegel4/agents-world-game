@@ -6,12 +6,14 @@ randomness; agents are always processed in list order.
 
 import random
 
-from . import actions, deck, indices
+from . import actions, deck, indices, knowledge
 from .memory import Memory
 from .genesis import BASELINE_DRIVES, make_world
 from .log import EventLog
 from .state import (
+    FAVOR_DECAY,
     GRUDGE_DECAY,
+    MESSAGE_TTL,
     HUNGER_PER_TICK,
     INTERACT_RADIUS,
     RESTRAINT_HUNGER_EROSION,
@@ -34,6 +36,9 @@ DEFAULT_CONFIG = {
     "founder_max_age": 140,
     "deck": True,          # set False for the §7.3 no-deck ablation arm
     "violence": True,      # set False for the no-defection ablation arm
+    # Any verb named here is removed from the action space. This is the §7.3
+    # ablation mechanism: run matched worlds with a verb withheld and compare.
+    "disabled_verbs": (),
     "deck_scale": 1.0,
     "snapshot_every": 25,
 }
@@ -86,6 +91,19 @@ def apply(world: World, agent, verb: str, params: dict, rng, log, w: int = 0, op
         actions.steal(world, agent, params["target_id"], log, w, opp)
     elif verb == "harm":
         actions.harm(world, agent, params["target_id"], rng, log, w, opp)
+    elif verb == "give":
+        actions.give(world, agent, params["target_id"],
+                     params.get("resource", "food"), log, w, opp)
+    elif verb == "teach":
+        actions.teach(world, agent, params["target_id"], log, w, opp)
+    elif verb == "form_bond":
+        actions.form_bond(world, agent, params["target_id"], log, w, opp)
+    elif verb == "speak":
+        actions.speak(world, agent, params["target_id"], log, w, opp)
+    elif verb == "leave_message":
+        actions.leave_message(world, agent, log, w, opp)
+    elif verb == "coerce":
+        actions.coerce(world, agent, params["target_id"], rng, log, w, opp)
     else:
         actions.idle(world, agent, log, w, opp)
 
@@ -123,6 +141,7 @@ def step(world: World, rng, log, deck_rng=None, cfg=None, mind=None) -> None:
     world.tick += 1
 
     violence = bool(cfg.get("violence", True)) if cfg else True
+    disabled = frozenset(cfg.get("disabled_verbs", ())) if cfg else frozenset()
 
     for agent in world.living_agents():
         agent.age += 1
@@ -140,11 +159,30 @@ def step(world: World, rng, log, deck_rng=None, cfg=None, mind=None) -> None:
         if mind is not None:
             verb, params = mind.choose(world, agent, rng, w, violence, log)
         else:
-            verb, params = brain.choose(world, agent, rng, w, violence)
+            verb, params = brain.choose(world, agent, rng, w, violence, disabled)
+        if verb in disabled:
+            verb, params = "idle", {}
         apply(world, agent, verb, params, rng, log, w, opp)
         update_drives(agent, verb)
         update_restraint(agent)
         agent.memory.decay(world.tick)
+
+        # Working something out alone is rare by design, so a world that reaches
+        # depth 3 got there by teaching rather than by parallel discovery.
+        if verb == "work":
+            found = knowledge.try_discover(agent, rng)
+            if found:
+                agent.techniques.add(found)
+                log.emit(world.tick, "discovery", agent=agent.id, technique=found,
+                         depth=knowledge.depth(found))
+
+        # Reading what someone left behind, including the dead.
+        for msg in world.messages:
+            if msg["x"] == agent.x and msg["y"] == agent.y and msg["by"] != agent.id:
+                agent.believe(msg["claim"], msg["about"], msg["by"], world.tick)
+                if msg["about"] != agent.id:
+                    agent.grudges[msg["about"]] = (
+                        agent.grudge_against(msg["about"]) + 0.25)
 
         if agent.hunger >= STARVATION_THRESHOLD:
             agent.alive = False
@@ -154,6 +192,15 @@ def step(world: World, rng, log, deck_rng=None, cfg=None, mind=None) -> None:
 
     for node in world.nodes:
         node.regenerate()
+
+    world.messages = [m for m in world.messages
+                      if world.tick - m["tick"] <= MESSAGE_TTL]
+
+    for agent in world.living_agents():
+        for other_id in list(agent.favors):
+            agent.favors[other_id] -= FAVOR_DECAY
+            if agent.favors[other_id] <= 0:
+                del agent.favors[other_id]
 
     if deck_rng is not None and cfg and cfg.get("deck", True):
         deck.draw(world, deck_rng, log, cfg.get("deck_scale", 1.0))

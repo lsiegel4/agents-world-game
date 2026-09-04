@@ -64,6 +64,15 @@ HARM_DEATH_P = 0.15
 GRUDGE_PER_OFFENSE = 1.0
 GRUDGE_DECAY = 0.0015
 
+# --- Social verbs (§5.5, M1 slice 2) ---------------------------------------
+GIVE_AMOUNT = 3.0
+FAVOR_PER_GIFT = 1.0
+FAVOR_DECAY = 0.0010
+BOND_RADIUS = 1            # you must be beside someone to bond with them
+COERCE_TAKE = 3.0
+MESSAGE_TTL = 600          # ticks a left message stays legible
+MAX_BELIEFS = 12
+
 
 @dataclass
 class ResourceNode:
@@ -115,6 +124,10 @@ class Agent:
     grudges: dict = field(default_factory=dict)   # agent_id -> accumulated offence
     memory: object = None                         # world.memory.Memory, lazily attached
     goal: str = ""                                # private; not visible to other agents
+    techniques: set = field(default_factory=set)  # what this agent knows how to do
+    favors: dict = field(default_factory=dict)    # agent_id -> kindness owed; grudge's mirror
+    bonds: set = field(default_factory=set)       # agent_ids this agent is tied to
+    beliefs: list = field(default_factory=list)   # [{claim, about, source, tick}]
 
     def has(self, kind: str) -> float:
         return self.inventory.get(kind, 0.0)
@@ -129,6 +142,24 @@ class Agent:
     def grudge_against(self, other_id: str) -> float:
         return self.grudges.get(other_id, 0.0)
 
+    def favor_from(self, other_id: str) -> float:
+        return self.favors.get(other_id, 0.0)
+
+    def standing(self, other_id: str) -> float:
+        """Net regard: kindness received minus wrongs done. Bonds add to it."""
+        base = self.favor_from(other_id) - self.grudge_against(other_id)
+        return base + (1.5 if other_id in self.bonds else 0.0)
+
+    def believe(self, claim: str, about: str, source: str, tick: int) -> None:
+        for b in self.beliefs:
+            if b["claim"] == claim and b["about"] == about:
+                b["tick"] = tick
+                return
+        self.beliefs.append({"claim": claim, "about": about,
+                             "source": source, "tick": tick})
+        if len(self.beliefs) > MAX_BELIEFS:
+            self.beliefs.pop(0)
+
     def exposure(self) -> float:
         """Hunger multiplier from a decayed shelter. 1.0 when fully sheltered."""
         return 1.0 + EXPOSURE_PENALTY * (1.0 - self.shelter)
@@ -142,6 +173,7 @@ class World:
     agents: list = field(default_factory=list)
     tick: int = 0
     last_disaster: int = 0
+    messages: list = field(default_factory=list)  # [{x, y, claim, about, by, tick}]
 
     def node_by_id(self, node_id: str):
         for n in self.nodes:

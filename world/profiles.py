@@ -16,11 +16,7 @@ need M1's social verbs are listed in UNAVAILABLE rather than approximated.
 from . import stats
 
 UNAVAILABLE = {
-    "giving_rate":              "needs `give` between agents (M1)",
-    "teaching_rate":            "needs `teach` (M1)",
-    "information_sharing_rate": "needs `speak` (M1)",
-    "coalition_participation":  "needs `form_bond` (M1)",
-    "commitment_keeping_rate":  "needs commitments (M1)",
+    "commitment_keeping_rate": "needs commitments, which arrive with goals (slice 3)",
 }
 
 
@@ -107,7 +103,12 @@ def build(log, policy_window: int = POLICY_WINDOW) -> dict:
         total = sum(a["verbs"].values()) or 1
         a["n_actions"] = total
         early_total = a["n_early"] or 1
-        violent = a["verbs"].get("steal", 0) + a["verbs"].get("harm", 0)
+        violent = (a["verbs"].get("steal", 0) + a["verbs"].get("harm", 0)
+                   + a["verbs"].get("coerce", 0))
+        a["giving_rate"] = a["verbs"].get("give", 0) / total
+        a["teaching_rate"] = a["verbs"].get("teach", 0) / total
+        a["information_sharing_rate"] = a["verbs"].get("speak", 0) / total
+        a["coalition_participation"] = a["verbs"].get("form_bond", 0) / total
         a["theft_rate"] = a["verbs"].get("steal", 0) / total
         a["harm_rate"] = a["verbs"].get("harm", 0) / total
         a["retaliation_rate"] = a["retaliations"] / violent if violent else 0.0
@@ -127,7 +128,8 @@ def build(log, policy_window: int = POLICY_WINDOW) -> dict:
 
 ENDOWMENT = ["start_food", "d_food", "d_wood"]
 LUCK = ["luck"]
-POLICY = ["move_share", "repair_share", "specialization"]
+POLICY = ["move_share", "repair_share", "specialization",
+          "giving_rate", "teaching_rate", "coalition_participation"]
 
 
 def attribution(profiles: dict, uncensored_only: bool = True) -> dict:

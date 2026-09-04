@@ -604,7 +604,13 @@ only, no LLM. Proved the economy produces non-degenerate outcomes; the §4.5 eve
 was pulled forward into this milestone. Permanent non-LLM control arm. Findings, and the
 reasons the M0 gate was retired rather than patched, are in README.md.
 
-**M1 — Cognition. ◐ Slice 1 built 2026-09-04, not yet run live.** State→prompt
+**M1 — Cognition. ◐ Slices 1 and 2 built 2026-09-04.** Slice 2 added the social verbs
+(`give`, `teach`, `form_bond`, `speak`, `leave_message`, `coerce`) and a technique graph,
+closing all of §7.1 except `goal_attainment`. The `teach` ablation is the first real
+answer to question 1: teaching nearly doubles population and triples knowledge depth.
+Remaining: private goals with revision at thresholds, and LLM memory consolidation.
+
+*Slice 1 detail.* State→prompt
 rendering, stakes-based tier routing, episodic memory with decay, record/replay model
 client with cost accounting and a spend ceiling. Verb set deliberately identical to
 Tier 0 so the first comparison isolates cognition. Measured escalation rate ~11%.
@@ -643,7 +649,12 @@ Closed alpha of sandbox mode.
 - Drive curve shapes: what functional form maps event history to drive weight change?
   Needs empirical tuning in M1 and is a research contribution in itself.
 - Death and inheritance: how frequent should death be? Too rare and nothing turns over;
-  too common and no agent accumulates enough to be interesting.
+  too common and no agent accumulates enough to be interesting. **Note (2026-09-04):**
+  §4.3 says agents age and die, but no mortality is currently attached to age at all —
+  only starvation, the deck, and violence kill. Agents reach 1200+ ticks, which distorts
+  every generational measure: a "third generation" that shares the world with its
+  founders is not a succession. Senescence is required before §7.6's lock-in test means
+  anything, alongside the archetype work.
 - Do agents need a theory of mind of other agents, or do relationship scalars suffice?
   Cheapest test: ablate the relationship model in M2.
 - Shared-world scale ceiling: what population makes the world feel alive without making

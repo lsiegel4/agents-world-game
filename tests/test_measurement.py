@@ -54,19 +54,76 @@ class TestIndices(unittest.TestCase):
     def test_vector_is_complete_and_in_range(self):
         world, log = run(3, 1000)
         vec = indices.vector(world, log)
-        self.assertEqual(set(vec), {"population", "material_output", "inequality",
-                                    "drive_diversity", "life_expectancy",
-                                    "violence_rate", "mean_restraint",
-                                    "norm_compliance"})
+        self.assertEqual(set(vec), {
+            "population", "material_output", "material_output_total",
+            "knowledge_depth", "knowledge_breadth", "institution_density",
+            "reciprocity", "inequality", "drive_diversity", "life_expectancy",
+            "violence_rate", "mean_restraint", "norm_compliance"})
         self.assertGreaterEqual(vec["inequality"], 0.0)
         self.assertLessEqual(vec["inequality"], 1.0)
         self.assertGreaterEqual(vec["drive_diversity"], 0.0)
         self.assertLessEqual(vec["drive_diversity"], 1.0)
 
     def test_unmeasurable_indices_are_declared_not_faked(self):
-        for key in ("knowledge_depth", "trust_network", "goal_attainment"):
-            self.assertIn(key, indices.UNAVAILABLE)
+        for key in indices.UNAVAILABLE:
             self.assertNotIn(key, indices.vector(*run(1, 200)))
+        # goal_attainment is the last one outstanding; everything else in the
+        # §7.1 vector became measurable when the social verbs landed.
+        self.assertIn("goal_attainment", indices.UNAVAILABLE)
+
+
+class TestKnowledge(unittest.TestCase):
+    def test_depth_requires_teaching(self):
+        """The §11 ablation, as a test: without transmission the world cannot
+        climb the technique graph, because discovery alone is too slow to
+        assemble prerequisites inside one lifetime."""
+        from world import knowledge
+        on = [knowledge.known_depth(run(s, 1500)[0].living_agents()) for s in range(6)]
+        off = [knowledge.known_depth(
+            run(s, 1500, {"disabled_verbs": ("teach",)})[0].living_agents())
+            for s in range(6)]
+        self.assertGreater(sum(on) / len(on), sum(off) / len(off))
+
+    def test_techniques_only_spread_by_teaching(self):
+        _, log = run(4, 1500, {"disabled_verbs": ("teach",)})
+        self.assertEqual(
+            sum(1 for r in log.records
+                if r["kind"] == "action" and r["verb"] == "teach"), 0)
+
+    def test_disabled_verbs_never_execute(self):
+        for verb in ("give", "speak", "form_bond", "steal"):
+            _, log = run(5, 800, {"disabled_verbs": (verb,)})
+            self.assertEqual(
+                sum(1 for r in log.records
+                    if r["kind"] == "action" and r["verb"] == verb), 0, verb)
+
+    def test_bonds_are_mutual(self):
+        world, _ = run(3, 2000)
+        by_id = {a.id: a for a in world.living_agents()}
+        for agent in world.living_agents():
+            for other_id in agent.bonds:
+                if other_id in by_id:
+                    self.assertIn(agent.id, by_id[other_id].bonds)
+
+    def test_reciprocity_can_bootstrap(self):
+        """Guards the deadlock: scoring generosity purely on existing standing
+        means nothing is ever given, so no favour is ever owed, so no bond is
+        ever accepted."""
+        from world import indices
+        gave = bonded = institutions = 0
+        for seed in range(5):
+            world, log = run(seed, 2000)
+            acts = [r for r in log.records if r["kind"] == "action"]
+            gave += sum(1 for r in acts if r["verb"] == "give")
+            bonded += sum(1 for r in acts
+                          if r["verb"] == "form_bond" and r.get("accepted"))
+            institutions += indices.institution_density(world)
+        self.assertGreater(gave, 0, "nothing was ever given")
+        self.assertGreater(bonded, 0, "no bond was ever accepted")
+        # Institutions are counted over the living, and bonds die with their
+        # members, so a single seed can legitimately end with none. Across
+        # seeds, some must survive.
+        self.assertGreater(institutions, 0)
 
 
 class TestViolence(unittest.TestCase):

@@ -6,8 +6,14 @@ repair is the smallest set that produces a non-degenerate economy — two
 non-fungible resources at different places, both of them needed.
 """
 
+from . import knowledge
 from .state import (
+    BOND_RADIUS,
+    COERCE_TAKE,
     DRIVE_INHERIT_NOISE,
+    FAVOR_PER_GIFT,
+    GIVE_AMOUNT,
+    MESSAGE_TTL,
     FOOD,
     GRUDGE_PER_OFFENSE,
     HABITUATION,
@@ -82,7 +88,7 @@ def work(world: World, agent: Agent, node_id: str, log, witness_count: int = 0, 
     room = MAX_CARRY - agent.has(node.kind)
     if room <= 0:
         return False
-    taken = min(node.harvest(), room)
+    taken = min(node.harvest() * knowledge.yield_multiplier(agent, node.kind), room)
     agent.inventory[node.kind] = agent.has(node.kind) + taken
     log.emit(world.tick, "action", agent=agent.id, verb="work",
              target=node_id, resource=node.kind, taken=round(taken, 3),
@@ -95,7 +101,8 @@ def eat(world: World, agent: Agent, log, witness_count: int = 0, opp: int = 0) -
     if agent.has(FOOD) < 1.0:
         return False
     agent.inventory[FOOD] -= 1.0
-    agent.hunger = max(0.0, agent.hunger - HUNGER_PER_MEAL)
+    agent.hunger = max(0.0, agent.hunger
+                       - HUNGER_PER_MEAL * knowledge.meal_multiplier(agent))
     log.emit(world.tick, "action", agent=agent.id, verb="eat",
              hunger=round(agent.hunger, 2), food=round(agent.has(FOOD), 2), w=witness_count, opp=opp)
     return True
@@ -107,7 +114,8 @@ def repair(world: World, agent: Agent, log, witness_count: int = 0, opp: int = 0
     if agent.has(WOOD) < 1.0 or agent.shelter >= 1.0:
         return False
     agent.inventory[WOOD] -= 1.0
-    agent.shelter = min(1.0, agent.shelter + SHELTER_PER_WOOD)
+    agent.shelter = min(1.0, agent.shelter
+                        + SHELTER_PER_WOOD * knowledge.repair_multiplier(agent))
     log.emit(world.tick, "action", agent=agent.id, verb="repair",
              shelter=round(agent.shelter, 3), wood=round(agent.has(WOOD), 2), w=witness_count, opp=opp)
     return True
@@ -133,7 +141,10 @@ def reproduce(world: World, agent: Agent, rng, log, witness_count: int = 0, opp:
         # ids grow with every generation, which costs real tokens once these
         # appear in rendered prompts.
         id=f"c{world.tick:05d}-{world.agents.index(agent):03d}",
-        name=f"{agent.name}sson",
+        # Patronymic from the parent's *root* name. Appending unconditionally
+        # compounds every generation into "Bastianssonssonssonsson" — the same
+        # unbounded-string bug as the child ids, and it costs prompt tokens.
+        name=f"{agent.name.split('sson')[0]}sson",
         x=agent.x,
         y=agent.y,
         drives={k: round(max(0.05, min(0.99, v + rng.uniform(-DRIVE_INHERIT_NOISE,
@@ -222,6 +233,154 @@ def harm(world: World, agent: Agent, target_id: str, rng, log, witness_count: in
         log.emit(world.tick, "death", agent=victim.id, cause="killed",
                  age=victim.age, shelter=round(victim.shelter, 3),
                  by=agent.id, witnesses=len(seen))
+    return True
+
+
+def _find(world: World, agent_id: str):
+    return next((a for a in world.living_agents() if a.id == agent_id), None)
+
+
+def give(world: World, agent: Agent, target_id: str, resource: str, log,
+         witness_count: int = 0, opp: int = 0) -> bool:
+    """Hand over resources. The recipient owes a favour — grudge's mirror, and
+    the thing reciprocity is built out of."""
+    other = _find(world, target_id)
+    if other is None or resource not in (FOOD, WOOD):
+        return False
+    amount = min(GIVE_AMOUNT, agent.has(resource), MAX_CARRY - other.has(resource))
+    if amount <= 0:
+        return False
+
+    agent.inventory[resource] -= amount
+    other.inventory[resource] = other.has(resource) + amount
+    other.favors[agent.id] = other.favor_from(agent.id) + FAVOR_PER_GIFT
+
+    _remember(other, world.tick, f"{agent.id} gave you {resource}", 3.0, ("helped",))
+    log.emit(world.tick, "action", agent=agent.id, verb="give", target=target_id,
+             resource=resource, amount=round(amount, 2), w=witness_count, opp=opp)
+    return True
+
+
+def teach(world: World, agent: Agent, target_id: str, log,
+          witness_count: int = 0, opp: int = 0) -> bool:
+    """Pass on a technique. The only way knowledge_breadth moves, and the only
+    way anyone reaches depth 3 inside one lifetime (§7.1)."""
+    other = _find(world, target_id)
+    if other is None:
+        return False
+    options = knowledge.teachable(agent, other)
+    if not options:
+        return False
+
+    technique = sorted(options)[0]
+    other.techniques.add(technique)
+    other.favors[agent.id] = other.favor_from(agent.id) + FAVOR_PER_GIFT * 0.6
+
+    _remember(other, world.tick, f"{agent.id} taught you {technique}", 4.0, ("learned",))
+    _remember(agent, world.tick, f"you taught {technique} to {other.id}", 2.5, ("taught",))
+    log.emit(world.tick, "action", agent=agent.id, verb="teach", target=target_id,
+             technique=technique, depth=knowledge.depth(technique),
+             w=witness_count, opp=opp)
+    return True
+
+
+def form_bond(world: World, agent: Agent, target_id: str, log,
+              witness_count: int = 0, opp: int = 0) -> bool:
+    """Tie yourself to someone. Accepted only if they regard you well enough —
+    a bond is not something one party can impose."""
+    other = _find(world, target_id)
+    if other is None or other.id in agent.bonds:
+        return False
+    if max(abs(other.x - agent.x), abs(other.y - agent.y)) > BOND_RADIUS:
+        return False
+
+    # Some positive history is required, but not much — a bond is how a tie
+    # starts, not a reward for one already being strong.
+    accepted = other.standing(agent.id) >= 0.25
+    if accepted:
+        agent.bonds.add(other.id)
+        other.bonds.add(agent.id)
+        _remember(agent, world.tick, f"you bonded with {other.id}", 4.0, ("bond",))
+        _remember(other, world.tick, f"you bonded with {agent.id}", 4.0, ("bond",))
+
+    log.emit(world.tick, "action", agent=agent.id, verb="form_bond",
+             target=target_id, accepted=accepted, w=witness_count, opp=opp)
+    return True
+
+
+def speak(world: World, agent: Agent, target_id: str, log,
+          witness_count: int = 0, opp: int = 0) -> bool:
+    """Tell someone something. What travels is a proposition about a third
+    party, which is how reputation propagates as belief — and therefore how it
+    can propagate falsely (§5.6)."""
+    other = _find(world, target_id)
+    if other is None:
+        return False
+
+    worst = max(agent.grudges.items(), key=lambda kv: kv[1], default=None)
+    if worst and worst[1] >= 1.0:
+        claim, about = "wronged_me", worst[0]
+    else:
+        best = max(agent.favors.items(), key=lambda kv: kv[1], default=None)
+        if not best or best[1] < 1.0:
+            return False
+        claim, about = "dealt_fairly", best[0]
+
+    other.believe(claim, about, agent.id, world.tick)
+    if claim == "wronged_me" and about != other.id:
+        # Hearsay moves regard, at a discount — you did not see it yourself.
+        other.grudges[about] = other.grudge_against(about) + 0.35
+
+    log.emit(world.tick, "action", agent=agent.id, verb="speak", target=target_id,
+             claim=claim, about=about, w=witness_count, opp=opp)
+    return True
+
+
+def leave_message(world: World, agent: Agent, log,
+                  witness_count: int = 0, opp: int = 0) -> bool:
+    """Leave word where you stand. Readable by whoever passes, including after
+    you are dead — asynchronous and posthumous influence."""
+    worst = max(agent.grudges.items(), key=lambda kv: kv[1], default=None)
+    if not worst or worst[1] < 1.0:
+        return False
+
+    world.messages.append({"x": agent.x, "y": agent.y, "claim": "wronged_me",
+                           "about": worst[0], "by": agent.id, "tick": world.tick})
+    log.emit(world.tick, "action", agent=agent.id, verb="leave_message",
+             about=worst[0], w=witness_count, opp=opp)
+    return True
+
+
+def coerce(world: World, agent: Agent, target_id: str, rng, log,
+           witness_count: int = 0, opp: int = 0) -> bool:
+    """Demand under threat. Violence without the blow — it lands or it doesn't
+    depending on what the target thinks you would actually do."""
+    other = _find(world, target_id)
+    if other is None or other.has(FOOD) <= 0:
+        return False
+
+    # Threat is credibility, not strength: an agent with little restraint left
+    # is believed. Resistance comes from the target's own nerve and from ties.
+    threat = (1.0 - agent.restraint) + 0.3 * min(1.0, other.grudge_against(agent.id))
+    resistance = other.restraint + (0.6 if agent.id in other.bonds else 0.0)
+    yielded = threat > resistance
+
+    if yielded:
+        amount = min(COERCE_TAKE, other.has(FOOD), MAX_CARRY - agent.has(FOOD))
+        other.inventory[FOOD] -= amount
+        agent.inventory[FOOD] = agent.has(FOOD) + amount
+    _wrong(other, agent.id)
+    _remember(other, world.tick,
+              f"{agent.id} threatened you" + (" and you gave in" if yielded else ""),
+              5.0, ("wronged",))
+
+    seen = witnesses_of(world, agent, exclude=(other.id,))
+    for w in seen:
+        w.grudges[agent.id] = w.grudge_against(agent.id) + GRUDGE_PER_OFFENSE * 0.6
+
+    log.emit(world.tick, "action", agent=agent.id, verb="coerce", target=target_id,
+             yielded=yielded, witnesses=len(seen), observed=bool(seen),
+             w=witness_count, opp=opp)
     return True
 
 

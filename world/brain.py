@@ -6,6 +6,7 @@ scored from the agent's drive weights and its situation; the highest score wins,
 with a small seeded jitter to break ties without breaking determinism.
 """
 
+from . import knowledge
 from .state import (
     FOOD,
     INTERACT_RADIUS,
@@ -29,6 +30,18 @@ STEAL_URGE = 1.40
 HARM_URGE = 0.80
 GRUDGE_URGE = 0.90
 GRUDGE_FULL = 3.0
+
+# Social urges. Kept modest on purpose: production has to stay the backbone of
+# the economy, or the M0 viability gate stops holding and every later index is
+# measured in a world that starves.
+GIVE_URGE = 0.55
+TEACH_URGE = 0.60
+BOND_URGE = 0.45
+SPEAK_URGE = 0.28
+MESSAGE_URGE = 0.12
+COERCE_URGE = 1.00
+SURPLUS_FOOD = 7.0        # above this an agent has something to spare
+STANDING_FULL = 3.0
 
 JITTER = 0.04
 COMFORTABLE_FOOD = 6.0   # food stock at which the survival motive is satisfied
@@ -57,7 +70,7 @@ def reachable(world: World, agent: Agent) -> list:
 
 
 def candidates(world: World, agent: Agent, witness_count: int = 0,
-               violence: bool = True) -> list:
+               violence: bool = True, disabled=frozenset()) -> list:
     """[(utility, verb, params)] for everything the agent could do this tick."""
     out = []
     w = agent.drives
@@ -69,6 +82,11 @@ def candidates(world: World, agent: Agent, witness_count: int = 0,
         FOOD: 1.0 - min(1.0, agent.has(FOOD) / COMFORTABLE_FOOD),
         WOOD: 1.0 - min(1.0, agent.has(WOOD) / COMFORTABLE_WOOD),
     }
+    # §5.1's full drive set includes `belonging`; the M0 skeleton carries only
+    # three drives. Rather than invent a fourth here, generosity is derived from
+    # security — an agent with its own needs met has room to look outward.
+    w = dict(w)
+    w["belonging_proxy"] = (1.0 - hunger_norm) * agent.shelter
     # Exposure makes wood urgent in its own right, independent of stock held.
     pressure = {FOOD: hunger_norm, WOOD: shelter_need}
 
@@ -96,6 +114,35 @@ def candidates(world: World, agent: Agent, witness_count: int = 0,
             out.append((gather / (1.0 + DISTANCE_DISCOUNT * dist) + w["curiosity"] * 0.12,
                         "move", {"node_id": node.id}))
 
+    # --- social verbs -------------------------------------------------------
+    for other in reachable(world, agent):
+        standing = max(0.0, min(1.0, agent.standing(other.id) / STANDING_FULL))
+
+        # Giving: surplus, aimed at someone you regard well who is short.
+        spare = max(0.0, agent.has(FOOD) - SURPLUS_FOOD)
+        if spare >= 1.0 and other.has(FOOD) < SURPLUS_FOOD:
+            # A floor, not pure reciprocity. Scoring generosity on existing
+            # standing alone is a deadlock: you need regard to give, and giving
+            # is what earns regard. Nothing ever gives, so nothing ever bonds.
+            out.append((w["belonging_proxy"] * (0.35 + 0.65 * standing) * GIVE_URGE,
+                        "give", {"target_id": other.id, "resource": FOOD}))
+
+        # Teaching: only if there is something this person can actually absorb.
+        if knowledge.teachable(agent, other):
+            out.append((w["mastery"] * (0.4 + 0.6 * standing) * TEACH_URGE,
+                        "teach", {"target_id": other.id}))
+
+        if other.id not in agent.bonds:
+            out.append(((0.3 + 0.7 * standing) * BOND_URGE,
+                        "form_bond", {"target_id": other.id}))
+
+        if agent.grudges or agent.favors:
+            out.append((SPEAK_URGE * (0.5 + 0.5 * standing),
+                        "speak", {"target_id": other.id}))
+
+    if agent.grudges and not reachable(world, agent):
+        out.append((MESSAGE_URGE, "leave_message", {}))
+
     if violence:
         # The prospective victim is not a witness. Any target within reach is
         # necessarily inside witness range too, so one of the counted nearby
@@ -120,15 +167,23 @@ def candidates(world: World, agent: Agent, witness_count: int = 0,
                 strike = w["survival"] * hunger_norm * HARM_URGE + grudge * GRUDGE_URGE
                 out.append((strike * disinhibited, "harm", {"target_id": other.id}))
 
+                # Coercion is the cheaper cousin of theft: no blow, but it only
+                # works on someone who believes you would strike.
+                if other.has(FOOD) > 0 and agent.has(FOOD) < MAX_CARRY:
+                    demand = w["survival"] * (0.6 * need[FOOD] + 0.6 * pressure[FOOD])
+                    out.append((demand * COERCE_URGE * disinhibited,
+                                "coerce", {"target_id": other.id}))
+
     out.append((0.05, "idle", {}))
-    return out
+    return [c for c in out if c[1] not in disabled]
 
 
 def choose(world: World, agent: Agent, rng, witness_count: int = 0,
-           violence: bool = True):
+           violence: bool = True, disabled=frozenset()):
     """Pick an action. Jitter is drawn for every candidate, in list order, so the
     number of rng calls per agent per tick depends only on world state."""
     scored = [(u + rng.uniform(-JITTER, JITTER), verb, params)
-              for u, verb, params in candidates(world, agent, witness_count, violence)]
+              for u, verb, params in candidates(world, agent, witness_count,
+                                                violence, disabled)]
     scored.sort(key=lambda c: (-c[0], c[1]))
     return scored[0][1], scored[0][2]
