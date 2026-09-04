@@ -176,6 +176,8 @@ class World:
     tick: int = 0
     last_disaster: int = 0
     messages: list = field(default_factory=list)  # [{x, y, claim, about, by, tick}]
+    terrain: list = field(default_factory=list)   # [height][width] biome grid, M3 only
+    lore: dict = field(default_factory=dict)      # §4.1 generation output, M3 only
 
     def node_by_id(self, node_id: str):
         for n in self.nodes:

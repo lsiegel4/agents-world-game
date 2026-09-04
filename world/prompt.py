@@ -117,6 +117,36 @@ def _goal_block(agent) -> str:
             + ". You have told nobody this.")
 
 
+def _lore_block(world, agent) -> str:
+    """What this agent grew up knowing — §4.1.
+
+    Common knowledge reaches everyone; local knowledge only where it happened.
+    Specialist and lost facts are withheld, which is what makes recovering them
+    worth doing. Myth is presented flatly beside history, unlabelled, because
+    an agent has no way to tell which is which.
+    """
+    lore = getattr(world, "lore", None)
+    if not lore:
+        return ""
+
+    lines = []
+    facts = [f for f in lore["history"]["facts"] if f["visibility"] == "common"]
+    if facts:
+        lines.append("What everyone here knows about the past:")
+        lines += [f"  {f['claim']}, in {f['era']}" for f in facts[:3]]
+
+    myths = lore.get("myths", [])
+    if myths:
+        lines.append("What people say, whether or not it happened:")
+        lines += [f"  {m['as_told']}" for m in myths[:2]]
+
+    taboos = lore["culture"].get("taboos", [])
+    if taboos:
+        lines.append(f"A thing that is simply not done here: {taboos[0]}.")
+
+    return "\n".join(lines)
+
+
 def _memory_block(agent, tick: int) -> str:
     if agent.memory is None:
         return ""
@@ -144,6 +174,7 @@ def render(world, agent, nearby_agents, nearby_nodes, brief: str = "") -> dict:
         _self_state(agent),
         _goal_block(agent),
         _observation(world, agent, nearby_agents, nearby_nodes),
+        _lore_block(world, agent),
         _memory_block(agent, world.tick),
         _brief_block(brief),
         "Take one action now.",

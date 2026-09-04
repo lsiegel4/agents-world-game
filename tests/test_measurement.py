@@ -190,6 +190,36 @@ class TestGoals(unittest.TestCase):
         self.assertNotIn("LEAK_TOKEN", rendered["system"] + rendered["user"])
 
 
+class TestMemoryConsolidation(unittest.TestCase):
+    def test_repetition_becomes_a_belief(self):
+        _, log = run(5, 4000)
+        formed = [r for r in log.records if r["kind"] == "belief"]
+        self.assertTrue(formed)
+        for record in formed:
+            self.assertEqual(record["source"], "consolidation")
+
+    def test_consolidation_needs_no_model(self):
+        """The control arm must not require an API key. If consolidation only
+        worked with a client, Tier 0 would stop being a control."""
+        world, _ = run(5, 3000)
+        self.assertTrue(any(a.beliefs for a in world.living_agents()))
+
+    def test_beliefs_outlive_the_episodes_behind_them(self):
+        """Consolidation is lossy on purpose: a grudge should survive
+        forgetting the incidents that caused it."""
+        from world.memory import Memory
+        from world.state import Agent
+        agent = Agent(id="a", name="n", x=0, y=0)
+        agent.memory = Memory()
+        for tick in range(5):
+            agent.memory.record(tick, "bob wronged you", 4.0, ("wronged",))
+        agent.memory.consolidate(agent, 400)
+        self.assertTrue(agent.beliefs)
+        agent.memory.decay(9000)
+        self.assertEqual(agent.memory.episodes, [])
+        self.assertTrue(agent.beliefs)
+
+
 class TestViolence(unittest.TestCase):
     def test_restraint_is_inherited_not_reset(self):
         """§5.6 upbringing: a child starts near its parent's *current* restraint,

@@ -3,7 +3,7 @@
 Headless simulation of a world of agents with private, heterogeneous goals.
 Design: [DESIGN.md](DESIGN.md). Spectator mockup: `mockup/spectator.html`.
 
-**Status: M0, M1 and M2 complete.** One live recording run done for $0.41. **All ten
+**Status: M0, M1, M2 and M3 complete.** One live recording run done for $0.41. **All ten
 §7.1 indices and all ten §7.3 behavioural-profile fields now compute** — both
 `UNAVAILABLE` maps are empty.
 Every agent runs on utility AI over its drive vector — this is the permanent non-LLM
@@ -38,6 +38,9 @@ No dependencies. Python 3.9+.
 | `world/deck.py` | Event deck — state-weighted draws, mixed valence, non-starvation death |
 | `world/knowledge.py` | Technique graph, discovery, transmission (§7.1 depth/breadth) |
 | `world/goals.py` | Private goals: generation, evaluation, revision, inheritance (§5.3) |
+| `world/terrain.py` | §4.1 passes 1-3: terrain, deep time, settlement siting |
+| `world/history.py` | §4.1 passes 4-6: history, culture, myth |
+| `world/worldgen.py` | §4.1 passes 7-9 and assembly of all nine |
 | `world/memory.py` | Episodic memory: salience, decay, ranked recall (§5.4) |
 | `world/prompt.py` | State -> prompt rendering and the API tool schema (§5.2) |
 | `world/cognition.py` | Stakes scoring, tier routing, model-driven action choice (§5.7) |
@@ -519,3 +522,71 @@ extinctions 1/20 -> 0/20**, via the reinforcement from meeting one.
 That is the second time separate PRNG streams have earned their keep, and the rule is
 worth stating plainly: **any new source of randomness gets its own stream, or every
 prior result silently becomes incomparable.**
+
+### Memory consolidation closes M1
+
+Repeated episodes fold into semantic beliefs (§5.4): four wrongs from the same person
+stop being four memories and become a belief about that person. It is **rule-based, not
+model-driven** — this runs in the Tier 0 control arm, and a control arm that needs an API
+key is not a control. The LLM version layers on top and gets compared against it rather
+than substituted for it.
+
+Consolidation is lossy on purpose. Beliefs outlive the episodes behind them, which is how
+a grudge survives forgetting the incidents that caused it — asserted by a test.
+
+
+## M3 — world generation
+
+All nine §4.1 passes, **template-driven and offline**. §4.1 calls for a model at passes
+4-6 and a model writes better prose, but a generator that *requires* one cannot be
+replayed later, cannot run in the Tier 0 control arm, and cannot be tested without a key.
+The model enriches this; it does not supply it.
+
+```
+python3 run.py --seed 42 --ticks 2000        # flat world (M0 placement, still default)
+```
+
+Set `worldgen: "generated"` in the config for the nine-pass world. **The flat generator
+remains the default on purpose** — every result recorded before M3 was measured against
+`genesis.py`, and changing the default would silently invalidate all of them. A test
+asserts it.
+
+### The two rules that make it worth building
+
+**History is not uniformly known.** Every fact carries a visibility — common, local,
+specialist, or lost. Agents are told common knowledge and the local knowledge of where
+they are; specialist and lost facts are withheld, which is what makes recovering them
+worth doing.
+
+**Myth contradicts history.** Pass 6 points at real facts from pass 4 and bends them, via
+ten distortion modes — `blames`, `inflates`, `erases`, `inverts`, `predates`, `merges`
+and others. Myths are rendered into prompts *flat beside the history, unlabelled*,
+because an agent has no way to tell which is which. `myth_divergence` measures the gap.
+
+### Diversity
+
+Two worlds should not read the same. Across ten seeds: **29+ distinct era names, 24+
+place names, era counts varying 5-8, fact counts 17-27.**
+
+- 13 era kinds with a **succession table** — a recovery needs something to recover from.
+  Without it the generator emitted "the Founding, the Recovery": grammatical, and nonsense.
+- 5 candidate names per kind, chosen for what an era felt like rather than how a
+  chronicler would classify it: *the Quiet Years*, *the Years of Knives*, *the Shut
+  Doors*, *the Winter That Stayed*.
+- 4-5 event templates per kind, a random subset used per era, so eras differ in how much
+  record they leave behind.
+- Place names built combinatorially from 18 prefixes x 14 suffixes — 252 possibilities,
+  so a shared name between worlds is a coincidence rather than the norm.
+
+A representative arc: *the Founding -> the Quarrel -> the Scattering -> the Relearning ->
+the Green Decades -> the Coming of Strangers -> the Overflowing -> the Reckoning.*
+
+### The regression this introduced, and the fix
+
+Generated worlds initially ran **mean population 6.83 with 4/12 extinct**, against the
+flat generator's 12.75 and 0/12. Cause: node capacity was multiplied by biome quality, and
+since marsh food scores 0.7 and wood-biome food 0.5, the generated world simply contained
+less food than a flat one. Biome quality should decide *where* resources sit and how they
+differ from each other, not how much exists in total. Normalised against the mean quality
+of chosen sites, generated worlds now run **14.75 with 0/12 extinct**, and node capacities
+still vary 24-48 — the heterogeneity §4.4 asks for, without the silent shrinkage.

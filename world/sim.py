@@ -34,6 +34,13 @@ DEFAULT_CONFIG = {
     "regen_rate": 0.025,
     "start_food": 6,
     "founder_max_age": 140,
+    # "flat" keeps genesis.py — the M0 placement every prior result was recorded
+    # against. "generated" runs the §4.1 nine-pass generator.
+    "worldgen": "flat",
+    "sites": 4,
+    "ruins": 3,
+    "history_years": 300,
+    "inequality": 0.5,
     "deck": True,          # set False for the §7.3 no-deck ablation arm
     "violence": True,      # set False for the no-defection ablation arm
     # Any verb named here is removed from the action space. This is the §7.3
@@ -212,6 +219,9 @@ def step(world: World, rng, log, deck_rng=None, cfg=None, mind=None,
         update_drives(agent, verb)
         update_restraint(agent)
         agent.memory.decay(world.tick)
+        for claim, subject in agent.memory.consolidate(agent, world.tick):
+            log.emit(world.tick, "belief", agent=agent.id,
+                     claim=claim, about=subject, source="consolidation")
 
         # Working something out alone is rare by design, so a world that reaches
         # depth 3 got there by teaching rather than by parallel discovery.
@@ -270,7 +280,11 @@ def run(seed: int, ticks: int, config: dict = None, mind=None):
     log.records[0]["deck"] = [
         {"event": name, "base_p": base} for name, base, _, _ in deck.DECK
     ]
-    world = make_world(seed, cfg)
+    if cfg.get("worldgen") == "generated":
+        from .worldgen import make_world as make_generated
+        world = make_generated(seed, cfg)
+    else:
+        world = make_world(seed, cfg)
     for agent in world.agents:
         log.emit(0, "spawn", agent=agent.id, generation=0, restraint=agent.restraint,
                  x=agent.x, y=agent.y, age=agent.age,

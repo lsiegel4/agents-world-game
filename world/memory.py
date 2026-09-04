@@ -9,6 +9,8 @@ Consolidation into semantic beliefs is an LLM pass and is left for the second
 M1 slice; this is the episodic half, and it needs no model.
 """
 
+CONSOLIDATE_EVERY = 300      # ticks between consolidation passes
+CONSOLIDATE_MIN = 4          # episodes about one subject before it becomes a belief
 RECENCY_HALFLIFE = 400.0     # ticks
 DECAY_FLOOR = 0.02           # below this an episode is forgotten outright
 MAX_EPISODES = 60
@@ -40,3 +42,38 @@ class Memory:
     def recall(self, tick: int, k: int = 5) -> list:
         ranked = sorted(self.episodes, key=lambda e: -self.salience(e, tick))
         return sorted(ranked[:k], key=lambda e: e["tick"])
+
+    def consolidate(self, agent, tick: int) -> list:
+        """Fold repeated episodes into semantic beliefs — §5.4.
+
+        Rule-based rather than model-driven, deliberately: this runs in the
+        Tier 0 control arm too, and a control arm that needs an API key is not
+        a control. The LLM version in cognition.py layers on top of this and is
+        compared against it, not substituted for it.
+
+        The rule is just repetition: four wrongs from the same person is no
+        longer four memories, it is a belief about that person. Consolidation
+        is lossy on purpose — the belief outlives the episodes it came from,
+        which is how a grudge survives forgetting the incidents.
+        """
+        if tick - getattr(self, "_last_consolidated", 0) < CONSOLIDATE_EVERY:
+            return []
+        self._last_consolidated = tick
+
+        tallies = {}
+        for episode in self.episodes:
+            for tag in episode["tags"]:
+                if tag not in ("wronged", "helped", "learned", "witnessed"):
+                    continue
+                subject = episode["text"].split()[0]
+                tallies[(tag, subject)] = tallies.get((tag, subject), 0) + 1
+
+        formed = []
+        for (tag, subject), count in sorted(tallies.items()):
+            if count < CONSOLIDATE_MIN:
+                continue
+            claim = {"wronged": "dangerous", "helped": "generous",
+                     "learned": "knowledgeable", "witnessed": "violent"}[tag]
+            agent.believe(claim, subject, "own_experience", tick)
+            formed.append((claim, subject))
+        return formed
