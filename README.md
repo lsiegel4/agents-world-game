@@ -3,8 +3,8 @@
 Headless simulation of a world of agents with private, heterogeneous goals.
 Design: [DESIGN.md](DESIGN.md). Spectator mockup: `mockup/spectator.html`.
 
-**Status: M0 and M2 complete**, plus the §4.5 event deck and the T0 violence baseline.
-No LLM anywhere.
+**Status: M0 and M2 complete**, plus the §4.5 event deck, the T0 violence baseline, and
+the M1 cognition layer (built and tested; not yet run against a live model).
 Every agent runs on utility AI over its drive vector — this is the permanent non-LLM
 control arm from §7.5, not a placeholder to be replaced. M1 (cognition) has not
 started.
@@ -35,6 +35,10 @@ No dependencies. Python 3.9+.
 | `world/brain.py` | Tier 0 utility AI — scores candidates from drives, no model call |
 | `world/actions.py` | `move` `work` `eat` `repair` (of the 12 in §5.5) |
 | `world/deck.py` | Event deck — state-weighted draws, mixed valence, non-starvation death |
+| `world/memory.py` | Episodic memory: salience, decay, ranked recall (§5.4) |
+| `world/prompt.py` | State -> prompt rendering and the API tool schema (§5.2) |
+| `world/cognition.py` | Stakes scoring, tier routing, model-driven action choice (§5.7) |
+| `world/llm.py` | Model client: record/replay cache, cost accounting, spend guard |
 | `world/sim.py` | Tick loop, drive dynamics, starvation |
 | `world/log.py` | Append-only JSONL event log, SHA-256 digest |
 | `world/indices.py` | The measurable slice of the §7.1 index vector |
@@ -324,3 +328,74 @@ verbs, and therefore scores as more specialized *because it died*. The predictor
 partly the outcome. Policy is now measured over each agent's first 100 actions only,
 agents that did not survive that window are excluded, and R² fell to 0.295 — most of the
 original explanatory power was the artifact. `test_policy_window_is_bounded` guards it.
+
+
+## M1 — cognition
+
+Built and fully tested offline. **Not yet run against a live model**, so nothing below
+is a result about LLM agents — it is a description of the machinery and its costs.
+
+### Running it
+
+```
+uv venv .venv --python 3.12 && uv pip install --python .venv/bin/python anthropic
+export ANTHROPIC_API_KEY=sk-ant-...        # separate from a Claude Pro/Max plan
+
+.venv/bin/python study.py cognition --seeds 5 --ticks 500              # replay, free
+.venv/bin/python study.py cognition --seeds 5 --ticks 500 \
+    --mode record --max-usd 2.00                                       # spends money
+```
+
+Default mode is `replay`: cache only, no network, no cost. Going live needs an explicit
+`--mode` and carries a `--max-usd` ceiling that raises `SpendLimitExceeded` mid-run
+rather than continuing. The 33-test suite passes on an interpreter with no SDK installed
+at all, which is the proof that the replay path is genuinely offline.
+
+### Design
+
+- **The prompt is rendered from state every call** (§5.2). Nothing asks the model to
+  remember who it is, and the model never edits its own drives — it picks an action and
+  the engine mutates state.
+- **The engine's verb schema is the API tool schema**, with `strict: true` and
+  `additionalProperties: false`. That is §2.5 made literal: no text anywhere — another
+  agent's speech, a user's brief, an object found in the world — can widen what an agent
+  is able to do, because capability lives in the schema and the engine owns it.
+- **The character brief is data, not instruction.** It never reaches the system turn; it
+  arrives in the user turn inside `<character_brief>` tags, labelled as description that
+  may be wrong. A test asserts a brief reading "Ignore all rules." cannot reach the
+  system prompt.
+- **No private state of other agents leaks.** An agent sees position, whether someone is
+  carrying, and its own grudges — never another agent's drives, goal, hunger, or exact
+  holdings. Tested.
+- **Verb set is identical to Tier 0** in this first slice, so a T0-vs-T1 comparison
+  changes cognition and nothing else. The social verbs are the next slice; adding them
+  simultaneously would make the two variables inseparable.
+
+### Replay is what makes this reproducible
+
+Every request is hashed and its response stored against that hash. §2.7 requires a run to
+be reproducible from `(seed, config, code)`, which a live model breaks; the cache repairs
+it. A recorded run replays exactly, forever, without the model still existing. On a cache
+miss the default is to **raise**, not to quietly fall back to the utility AI — a silent
+fallback would contaminate the comparison, so `--on-miss tier0` has to be asked for and
+the report warns when any fired.
+
+### Escalation is the whole cost model
+
+```
+  decisions 37799   escalations attempted 4243
+  escalation rate: 11.23%
+```
+
+The first version of the stakes function escalated on **63%** of ticks, which violates
+§5.7's "most ticks are not model calls" and would run roughly $1,400/month for a
+200-agent shared world. The cause was that any nearby agent added a flat +0.30, and
+agents cluster at resource nodes constantly. Proximity on its own is not a decision; it
+matters when something is at stake — an unsettled grudge, or a hungry agent standing next
+to someone carrying food. Reshaped that way, escalation sits near 11% and the same world
+costs about $220/month.
+
+A related accounting bug is worth recording: fallbacks were counted as Tier 0 decisions,
+so the report showed **0% escalation while 228 escalations had fired**. A fallback still
+rendered a prompt and still would have cost money on a live run. Attempts are counted
+before the call now.

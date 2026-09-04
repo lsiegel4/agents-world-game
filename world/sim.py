@@ -7,6 +7,7 @@ randomness; agents are always processed in list order.
 import random
 
 from . import actions, deck, indices
+from .memory import Memory
 from .genesis import BASELINE_DRIVES, make_world
 from .log import EventLog
 from .state import (
@@ -117,7 +118,7 @@ def update_restraint(agent) -> None:
             del agent.grudges[other_id]
 
 
-def step(world: World, rng, log, deck_rng=None, cfg=None) -> None:
+def step(world: World, rng, log, deck_rng=None, cfg=None, mind=None) -> None:
     from . import brain
     world.tick += 1
 
@@ -134,10 +135,16 @@ def step(world: World, rng, log, deck_rng=None, cfg=None) -> None:
         # denominator and a decision-time numerator measure different worlds and
         # the norm-compliance ratio is computed over mismatched arms.
         w, opp = surroundings(world, agent)
-        verb, params = brain.choose(world, agent, rng, w, violence)
+        if agent.memory is None:
+            agent.memory = Memory()
+        if mind is not None:
+            verb, params = mind.choose(world, agent, rng, w, violence, log)
+        else:
+            verb, params = brain.choose(world, agent, rng, w, violence)
         apply(world, agent, verb, params, rng, log, w, opp)
         update_drives(agent, verb)
         update_restraint(agent)
+        agent.memory.decay(world.tick)
 
         if agent.hunger >= STARVATION_THRESHOLD:
             agent.alive = False
@@ -155,8 +162,12 @@ def step(world: World, rng, log, deck_rng=None, cfg=None) -> None:
         log.emit(world.tick, "indices", **indices.snapshot(world))
 
 
-def run(seed: int, ticks: int, config: dict = None):
-    """Run one world to completion. Returns (world, log)."""
+def run(seed: int, ticks: int, config: dict = None, mind=None):
+    """Run one world to completion. Returns (world, log).
+
+    `mind` is an optional world.cognition.Cognition. With none, every agent runs
+    on the Tier 0 utility AI — the permanent control arm (§7.5).
+    """
     cfg = dict(DEFAULT_CONFIG)
     if config:
         cfg.update(config)
@@ -184,7 +195,7 @@ def run(seed: int, ticks: int, config: dict = None):
     deck_rng = random.Random(seed ^ 0xDECC)
 
     for _ in range(ticks):
-        step(world, rng, log, deck_rng, cfg)
+        step(world, rng, log, deck_rng, cfg, mind)
         if not world.living_agents():
             log.emit(world.tick, "extinction")
             break

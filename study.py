@@ -16,7 +16,8 @@ Protocol rules this harness enforces:
 
 import argparse
 
-from world import indices, profiles, stats
+from world import cognition, indices, profiles, stats
+from world.llm import ModelClient
 from world.sim import run
 
 INDEX_KEYS = ["population", "material_output", "inequality",
@@ -136,6 +137,68 @@ def cmd_violence(args):
               f"{stats.mean(all_restraint):.3f}")
 
 
+def cmd_cognition(args):
+    """T0 (utility AI) against T1 (model), same seeds, same verbs.
+
+    The verb set is identical in both arms, so a difference in the indices is
+    attributable to cognition and not to a wider action space. This is the
+    comparison the permanent control arm in brain.py exists for (§7.5).
+    """
+    client = ModelClient(cache_path=args.cache, mode=args.mode, max_usd=args.max_usd,
+                         progress_every=args.progress_every)
+    if args.mode != "replay":
+        print(f"  spending real money (mode={args.mode}, ceiling "
+              f"${args.max_usd:.2f}). Live cost below.\n", flush=True)
+
+    t0 = {k: [] for k in INDEX_KEYS}
+    t1 = {k: [] for k in INDEX_KEYS}
+    minds = []
+
+    for seed in range(args.seeds):
+        world, log = run(seed, args.ticks)
+        for k in INDEX_KEYS:
+            t0[k].append(indices.vector(world, log)[k])
+
+        mind = cognition.Cognition(client=client, on_cache_miss=args.on_miss)
+        world, log = run(seed, args.ticks, mind=mind)
+        for k in INDEX_KEYS:
+            t1[k].append(indices.vector(world, log)[k])
+        minds.append(mind)
+
+    print(f"COGNITION · Tier 0 vs Tier 1 · {args.seeds} paired seeds · "
+          f"{args.ticks} ticks · mode={args.mode}\n")
+    print(f"{'index':<18} {'tier0':>9} {'tier1':>9} {'delta':>9} {'cohen d':>9}")
+    for k in INDEX_KEYS:
+        a, b = t1[k], t0[k]
+        print(f"{k:<18} {stats.mean(b):>9.3f} {stats.mean(a):>9.3f} "
+              f"{stats.mean(a) - stats.mean(b):>9.3f} {stats.cohens_d(a, b):>9.2f}")
+
+    keys = ("decisions", "attempted_t1", "attempted_t2", "served_by_model",
+            "fallbacks", "no_tool_call")
+    total = {k: 0 for k in keys}
+    for m in minds:
+        r = m.report()
+        for k in keys:
+            total[k] += r[k]
+    decisions = total["decisions"] or 1
+    attempted = total["attempted_t1"] + total["attempted_t2"]
+
+    print(f"\n  decisions {decisions}   escalations attempted {attempted} "
+          f"(t1 {total['attempted_t1']}, t2 {total['attempted_t2']})")
+    print(f"  escalation rate: {attempted / decisions:.2%}"
+          "   <- the cost lever (§10)")
+    print(f"  served by model: {total['served_by_model']}   "
+          f"fell back to tier0: {total['fallbacks']}   "
+          f"no tool call: {total['no_tool_call']}")
+    if total["fallbacks"]:
+        print("  NOTE: fallbacks ran the utility AI, so those ticks are not a")
+        print("        model arm. Treat this run as incomplete, not as a result.")
+    rep = client.report()
+    print(f"\n  model calls {rep['calls']} (cache hits {rep['cache_hits']})  "
+          f"tokens {rep['input_tokens']}in/{rep['output_tokens']}out  "
+          f"cost ${rep['cost_usd']:.4f}")
+
+
 def cmd_replay(args):
     """§2.7: a run that cannot be reproduced is anecdote, not data."""
     ok = True
@@ -153,12 +216,24 @@ def main():
     sub = p.add_subparsers(dest="cmd", required=True)
     for name, fn in (("indices", cmd_indices), ("ablation", cmd_ablation),
                      ("attribution", cmd_attribution), ("violence", cmd_violence),
-                     ("replay", cmd_replay)):
+                     ("cognition", cmd_cognition), ("replay", cmd_replay)):
         sp = sub.add_parser(name)
         sp.add_argument("--seeds", type=int, default=20)
         sp.add_argument("--ticks", type=int, default=2000)
         if name == "ablation":
             sp.add_argument("--arm", default="deck")
+        if name == "cognition":
+            # Defaults spend nothing: replay mode never touches the network, and
+            # going live takes an explicit mode plus an explicit ceiling.
+            sp.add_argument("--mode", default="replay",
+                            choices=["replay", "record", "live"])
+            sp.add_argument("--cache", default="cache/model.jsonl")
+            sp.add_argument("--max-usd", type=float, default=1.0, dest="max_usd")
+            sp.add_argument("--on-miss", default="error",
+                            choices=["error", "tier0"], dest="on_miss")
+            sp.add_argument("--progress-every", type=int, default=25,
+                            dest="progress_every",
+                            help="print running cost every N billed calls (0 = off)")
         sp.set_defaults(fn=fn)
     args = p.parse_args()
     args.fn(args)

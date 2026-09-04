@@ -113,6 +113,8 @@ class Agent:
     restraint: float = RESTRAINT_BASE
     restraint_base: float = RESTRAINT_BASE
     grudges: dict = field(default_factory=dict)   # agent_id -> accumulated offence
+    memory: object = None                         # world.memory.Memory, lazily attached
+    goal: str = ""                                # private; not visible to other agents
 
     def has(self, kind: str) -> float:
         return self.inventory.get(kind, 0.0)

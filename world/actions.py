@@ -45,6 +45,11 @@ def witnesses_of(world: World, actor: Agent, exclude=()) -> list:
     return out
 
 
+def _remember(agent: Agent, tick: int, text: str, weight: float, tags=()) -> None:
+    if agent.memory is not None:
+        agent.memory.record(tick, text, weight, tags)
+
+
 def _wrong(victim: Agent, offender_id: str) -> None:
     """Being wronged lowers the victim's own restraint. This is the environment
     half of §5.6 — violence propagates through the people it lands on."""
@@ -123,7 +128,11 @@ def reproduce(world: World, agent: Agent, rng, log, witness_count: int = 0, opp:
     agent.last_birth = world.tick
 
     child = Agent(
-        id=f"c{world.tick:05d}-{agent.id}",
+        # Short, deterministic, unique: one birth per parent per tick, and a
+        # parent's index is unique. Concatenating the parent's id instead makes
+        # ids grow with every generation, which costs real tokens once these
+        # appear in rendered prompts.
+        id=f"c{world.tick:05d}-{world.agents.index(agent):03d}",
         name=f"{agent.name}sson",
         x=agent.x,
         y=agent.y,
@@ -143,6 +152,7 @@ def reproduce(world: World, agent: Agent, rng, log, witness_count: int = 0, opp:
     )
     world.agents.append(child)
 
+    _remember(agent, world.tick, f"you had a child, {child.id}", 5.0, ("life",))
     log.emit(world.tick, "birth", agent=child.id, parent=agent.id,
              generation=child.generation, drives=child.drives,
              parent_food=round(agent.has(FOOD), 2), w=witness_count, opp=opp)
@@ -170,6 +180,8 @@ def steal(world: World, agent: Agent, target_id: str, log, witness_count: int = 
     for w in seen:
         w.grudges[agent.id] = w.grudge_against(agent.id) + GRUDGE_PER_OFFENSE * 0.4
 
+    _remember(victim, world.tick, f"{agent.id} took food from you", 4.0, ("wronged",))
+    _remember(agent, world.tick, f"you took food from {victim.id}", 2.5, ("did",))
     log.emit(world.tick, "action", agent=agent.id, verb="steal",
              target=target_id, taken=round(taken, 2),
              witnesses=len(seen), observed=bool(seen),
@@ -191,6 +203,12 @@ def harm(world: World, agent: Agent, target_id: str, rng, log, witness_count: in
     seen = witnesses_of(world, agent, exclude=(victim.id,))
     for w in seen:
         w.grudges[agent.id] = w.grudge_against(agent.id) + GRUDGE_PER_OFFENSE
+
+    _remember(victim, world.tick, f"{agent.id} attacked you", 6.0, ("wronged",))
+    _remember(agent, world.tick, f"you attacked {victim.id}", 4.0, ("did",))
+    for bystander in seen:
+        _remember(bystander, world.tick,
+                  f"you saw {agent.id} attack {victim.id}", 3.0, ("witnessed",))
 
     killed = rng.random() < HARM_DEATH_P
     log.emit(world.tick, "action", agent=agent.id, verb="harm",

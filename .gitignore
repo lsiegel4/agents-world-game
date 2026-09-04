@@ -2,3 +2,9 @@ __pycache__/
 *.py[cod]
 runs/
 .DS_Store
+
+# Secrets — never commit. See README "Credentials".
+.env
+.env.*
+!.env.example
+cache/

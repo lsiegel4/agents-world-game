@@ -487,6 +487,12 @@ Worth building for, because they are cheap once the state model above exists:
   dissociate are the interesting ones.
 - **Value lock-in.** Do early institutions freeze the drive distribution of later
   generations? Test by comparing founder cohort drives to third-generation drives.
+  **Blocked on real archetypes (§12).** Founders currently all start from one drive
+  baseline with noise, so "the founder cohort" is not a cohort — it is one distribution
+  sampled twice, and any convergence measured against it would be regression to a mean
+  the design put there. Differentiated archetypes must land first, or this test returns a
+  number that looks like a finding and is an artifact. Same caveat applies to running it
+  on `restraint` (§5.6).
 - **Meaning vs. attainment.** Agents that fail their goal but hold dense relationships
   and commitments versus agents that succeed alone. Both are measurable; the question of
   which is "better off" is precisely the one the sim refuses to answer and instead
@@ -598,8 +604,13 @@ only, no LLM. Proved the economy produces non-degenerate outcomes; the §4.5 eve
 was pulled forward into this milestone. Permanent non-LLM control arm. Findings, and the
 reasons the M0 gate was retired rather than patched, are in README.md.
 
-**M1 — Cognition.** State→prompt rendering, tier routing, tools, memory with decay and
-consolidation. Single cheap model. Sandbox mode only. `coerce` lands here, with `speak`.
+**M1 — Cognition. ◐ Slice 1 built 2026-09-04, not yet run live.** State→prompt
+rendering, stakes-based tier routing, episodic memory with decay, record/replay model
+client with cost accounting and a spend ceiling. Verb set deliberately identical to
+Tier 0 so the first comparison isolates cognition. Measured escalation rate ~11%.
+Remaining in M1: the social verbs (`speak`, `give`, `teach`, `form_bond`,
+`leave_message`, `coerce`), private goals with revision at thresholds, and LLM memory
+consolidation into semantic beliefs.
 
 *Prerequisite done 2026-09-04:* `steal` and `harm` are implemented at Tier 0, so LLM
 agents' violence can be compared against a utility-AI baseline rather than reported on
@@ -640,6 +651,15 @@ Closed alpha of sandbox mode.
 - Whether the intervention economy corrupts the research value of shared-world data
   beyond the "observational only" caveat.
 - Whether goal attainment should ever be visible to other agents, or only inferrable.
+- **Archetypes are currently a label, not a mechanism.** §6.1 specifies six, and they are
+  meant to differ in locked scaffold, initial drive vector, endowment distribution and
+  tool affinities; today they differ in none of those, and every agent shares one generic
+  system scaffold. Expanding the set and giving each its own scaffold is deferred, but it
+  is load-bearing for two things beyond flavour: §7.1's drive-diversity index reads near
+  1.0 largely because the population starts from one baseline, and §7.6's value lock-in
+  test needs founder cohorts that genuinely differ to have anything to compare. Each
+  scaffold is also an ablation arm — and each change orphans the response cache, so they
+  want batching into one planned experiment rather than iterative tweaking.
 - ~~The tool schema contains no verb for violence, theft, or coercion.~~ **Resolved
   2026-09-04: the verbs are in.** `steal`, `harm` and `coerce` were added to §5.5, with
   §5.6 specifying that propensity comes from circumstance filtered through an inherited,
