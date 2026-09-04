@@ -1,0 +1,996 @@
+<title>Kestrel Basin Console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+
+<style>
+:root {
+  --bg: #EAEEEC;
+  --surface: #F7FAF8;
+  --surface-2: #E1E7E4;
+  --ink: #131B1A;
+  --muted: #56655F;
+  --faint: #83958E;
+  --line: #C6D1CC;
+  --accent: #0F6E6B;
+  --accent-soft: #D5E5E3;
+  --on-accent: #F7FAF8;
+  --good: #3F7A56;
+  --warn: #A8791A;
+  --crit: #9E3B2E;
+
+  --d-survival: #C4553B;
+  --d-status:   #B08428;
+  --d-belonging:#4E8C6A;
+  --d-curiosity:#3E7CA8;
+  --d-mastery:  #7A5FA6;
+  --d-autonomy: #6E7B3F;
+  --d-legacy:   #96608A;
+
+  --t-water:  #9DBCC4;
+  --t-marsh:  #A8B48C;
+  --t-meadow: #BFCCA4;
+  --t-wood:   #7E9A72;
+  --t-stone:  #B9BEB8;
+
+  --shadow: 0 1px 2px rgba(19,27,26,.06), 0 8px 24px rgba(19,27,26,.05);
+  --r: 4px;
+
+  --f-display: "Fraunces", Georgia, "Times New Roman", serif;
+  --f-ui: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-data: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0D1413;
+    --surface: #141D1C;
+    --surface-2: #1C2726;
+    --ink: #E3EAE7;
+    --muted: #8CA09A;
+    --faint: #63756F;
+    --line: #2A3735;
+    --accent: #46A79F;
+    --accent-soft: #1B3230;
+    --on-accent: #0D1413;
+    --good: #63A87A;
+    --warn: #C79A3C;
+    --crit: #C4614F;
+
+    --d-survival: #DB7A61;
+    --d-status:   #D0A34A;
+    --d-belonging:#6FB48D;
+    --d-curiosity:#5E9FCC;
+    --d-mastery:  #A084CC;
+    --d-autonomy: #96A45F;
+    --d-legacy:   #BC85AF;
+
+    --t-water:  #24424A;
+    --t-marsh:  #3A4433;
+    --t-meadow: #46533A;
+    --t-wood:   #2E4230;
+    --t-stone:  #3B403A;
+
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.3);
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg: #0D1413;
+  --surface: #141D1C;
+  --surface-2: #1C2726;
+  --ink: #E3EAE7;
+  --muted: #8CA09A;
+  --faint: #63756F;
+  --line: #2A3735;
+  --accent: #46A79F;
+  --accent-soft: #1B3230;
+  --on-accent: #0D1413;
+  --good: #63A87A;
+  --warn: #C79A3C;
+  --crit: #C4614F;
+
+  --d-survival: #DB7A61;
+  --d-status:   #D0A34A;
+  --d-belonging:#6FB48D;
+  --d-curiosity:#5E9FCC;
+  --d-mastery:  #A084CC;
+  --d-autonomy: #96A45F;
+  --d-legacy:   #BC85AF;
+
+  --t-water:  #24424A;
+  --t-marsh:  #3A4433;
+  --t-meadow: #46533A;
+  --t-wood:   #2E4230;
+  --t-stone:  #3B403A;
+
+  --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.3);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--f-ui);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+button { font: inherit; color: inherit; cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.mockup-flag {
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+  font-family: var(--f-data);
+  font-size: 10.5px;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+  padding: 6px 16px;
+  display: flex;
+  gap: 14px;
+  align-items: baseline;
+  flex-wrap: wrap;
+}
+.mockup-flag strong { color: var(--ink); font-weight: 600; }
+
+/* ---------- shell ---------- */
+.shell {
+  display: grid;
+  grid-template-columns: 260px minmax(0,1fr) 320px;
+  grid-template-rows: auto minmax(420px, 1fr) auto;
+  grid-template-areas:
+    "top top top"
+    "roster stage inspector"
+    "feed feed dock";
+  gap: 1px;
+  background: var(--line);
+  min-height: calc(100vh - 33px);
+}
+.shell > * { background: var(--bg); }
+
+/* ---------- top bar ---------- */
+.top {
+  grid-area: top;
+  background: var(--surface);
+  display: flex;
+  align-items: stretch;
+  flex-wrap: wrap;
+}
+.brand {
+  padding: 12px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  border-right: 1px solid var(--line);
+  min-width: 240px;
+}
+.brand h1 {
+  font-family: var(--f-display);
+  font-size: 21px;
+  font-weight: 600;
+  letter-spacing: -.01em;
+  margin: 0;
+  line-height: 1.15;
+}
+.brand .sub {
+  font-family: var(--f-data);
+  font-size: 10.5px;
+  color: var(--muted);
+  letter-spacing: .04em;
+}
+
+.clock {
+  padding: 12px 18px;
+  border-right: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.tick-num {
+  font-family: var(--f-data);
+  font-size: 20px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -.02em;
+}
+.tick-meta { font-family: var(--f-data); font-size: 10.5px; color: var(--muted); line-height: 1.35; }
+.pulse {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--good);
+  box-shadow: 0 0 0 0 var(--good);
+}
+.playing .pulse { animation: beat 1.2s ease-out infinite; }
+@keyframes beat {
+  0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--good) 55%, transparent); }
+  70%  { box-shadow: 0 0 0 7px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+@media (prefers-reduced-motion: reduce) { .playing .pulse { animation: none; } }
+
+.transport { display: flex; gap: 6px; padding: 12px 18px; border-right: 1px solid var(--line); align-items: center; }
+.btn {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 5px 11px;
+  font-size: 12.5px;
+  color: var(--ink);
+  transition: background .12s, border-color .12s;
+}
+.btn:hover { background: var(--surface-2); }
+.btn[aria-pressed="true"], .btn.primary {
+  background: var(--accent); border-color: var(--accent); color: var(--on-accent);
+}
+.btn.small { padding: 3px 8px; font-size: 11.5px; }
+
+/* indices strip */
+.indices {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+  min-width: 340px;
+}
+.idx {
+  padding: 10px 14px;
+  border-left: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.idx:first-child { border-left: 0; }
+.idx .k {
+  font-family: var(--f-data);
+  font-size: 9.5px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.idx .v {
+  font-family: var(--f-data);
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+  display: flex; align-items: baseline; gap: 5px;
+}
+.delta { font-size: 10.5px; }
+.delta.up { color: var(--good); }
+.delta.down { color: var(--crit); }
+.delta.flat { color: var(--faint); }
+
+/* ---------- roster ---------- */
+.panel-head {
+  padding: 9px 14px;
+  border-bottom: 1px solid var(--line);
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  background: var(--surface);
+}
+.panel-head h2 {
+  margin: 0;
+  font-family: var(--f-data);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.count { font-family: var(--f-data); font-size: 10.5px; color: var(--faint); font-variant-numeric: tabular-nums; }
+
+.roster { grid-area: roster; background: var(--surface); display: flex; flex-direction: column; min-height: 0; }
+.roster-list { overflow-y: auto; flex: 1; }
+.row {
+  display: grid;
+  grid-template-columns: 22px 1fr auto;
+  gap: 9px;
+  align-items: center;
+  width: 100%;
+  text-align: left;
+  padding: 8px 14px;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-left: 2px solid transparent;
+}
+.row:hover { background: var(--surface-2); }
+.row[aria-current="true"] { background: var(--accent-soft); border-left-color: var(--accent); }
+.dot { width: 11px; height: 11px; border-radius: 50%; justify-self: center; }
+.row .nm { font-size: 13px; line-height: 1.25; }
+.row .ar { font-family: var(--f-data); font-size: 10px; color: var(--muted); letter-spacing: .03em; }
+.row .st { font-family: var(--f-data); font-size: 10px; color: var(--faint); text-align: right; font-variant-numeric: tabular-nums; }
+.row.dead .nm { color: var(--muted); text-decoration: line-through; }
+
+/* ---------- stage ---------- */
+.stage { grid-area: stage; background: var(--surface); display: flex; flex-direction: column; min-height: 0; }
+.layers { display: flex; gap: 6px; flex-wrap: wrap; }
+.canvas-wrap { position: relative; flex: 1; min-height: 340px; }
+canvas { display: block; width: 100%; height: 100%; }
+.legend {
+  position: absolute; left: 12px; bottom: 12px;
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 8px 10px;
+  display: grid; grid-template-columns: auto auto; gap: 3px 12px;
+  font-family: var(--f-data); font-size: 10px; color: var(--muted);
+  backdrop-filter: blur(3px);
+}
+.legend i { display: inline-block; width: 8px; height: 8px; margin-right: 5px; vertical-align: 0; }
+.scale {
+  position: absolute; right: 12px; bottom: 12px;
+  font-family: var(--f-data); font-size: 10px; color: var(--muted);
+  text-align: right; line-height: 1.4;
+}
+
+/* agent action bar */
+.verbs { border-top: 1px solid var(--line); padding: 10px 14px; background: var(--surface); }
+.verbs h3 {
+  margin: 0 0 8px;
+  font-family: var(--f-data); font-size: 10.5px; font-weight: 600;
+  letter-spacing: .1em; text-transform: uppercase; color: var(--muted);
+}
+.verb-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(122px, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; }
+.verb {
+  background: var(--surface);
+  padding: 7px 9px;
+  display: flex; flex-direction: column; gap: 2px;
+}
+.verb .sig { font-family: var(--f-data); font-size: 11.5px; }
+.verb .note { font-size: 10.5px; color: var(--faint); line-height: 1.3; }
+.verb.active { background: var(--accent-soft); }
+.verb.active .sig { color: var(--accent); font-weight: 600; }
+.verb.locked { opacity: .48; }
+
+/* ---------- inspector ---------- */
+.inspector { grid-area: inspector; background: var(--surface); display: flex; flex-direction: column; min-height: 0; overflow-y: auto; }
+.ins-id { padding: 13px 16px 12px; border-bottom: 1px solid var(--line); }
+.ins-id h2 { font-family: var(--f-display); font-size: 20px; font-weight: 600; margin: 0 0 1px; letter-spacing: -.01em; }
+.ins-id .meta { font-family: var(--f-data); font-size: 10.5px; color: var(--muted); }
+.tags { display: flex; gap: 5px; margin-top: 8px; flex-wrap: wrap; }
+.tag {
+  font-family: var(--f-data); font-size: 10px; letter-spacing: .04em;
+  border: 1px solid var(--line); border-radius: 999px; padding: 2px 8px; color: var(--muted);
+}
+.tag.warn { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 45%, var(--line)); }
+.tag.good { color: var(--good); border-color: color-mix(in srgb, var(--good) 45%, var(--line)); }
+
+.sec { padding: 12px 16px; border-bottom: 1px solid var(--line); }
+.sec > h3 {
+  margin: 0 0 9px;
+  font-family: var(--f-data); font-size: 10px; font-weight: 600;
+  letter-spacing: .1em; text-transform: uppercase; color: var(--muted);
+}
+.goal { font-family: var(--f-display); font-size: 15.5px; line-height: 1.38; margin: 0 0 7px; text-wrap: balance; }
+.crit-list { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; }
+.crit-list li { font-family: var(--f-data); font-size: 11px; color: var(--muted); display: grid; grid-template-columns: 14px 1fr; gap: 6px; }
+.crit-list .mark { color: var(--good); }
+.crit-list .mark.no { color: var(--faint); }
+.revised { font-size: 11.5px; color: var(--muted); margin-top: 9px; padding-top: 8px; border-top: 1px dashed var(--line); }
+.revised em { font-family: var(--f-display); font-style: italic; color: var(--ink); }
+
+/* drive vector */
+.drives { display: grid; gap: 6px; }
+.drive { display: grid; grid-template-columns: 68px 1fr 38px; gap: 8px; align-items: center; }
+.drive .lb { font-family: var(--f-data); font-size: 10.5px; color: var(--muted); }
+.track { height: 8px; background: var(--surface-2); border-radius: 2px; overflow: hidden; position: relative; }
+.fill { height: 100%; border-radius: 2px; }
+.base { position: absolute; top: -2px; bottom: -2px; width: 1px; background: var(--faint); }
+.drive .nv { font-family: var(--f-data); font-size: 10.5px; font-variant-numeric: tabular-nums; text-align: right; color: var(--muted); }
+.drift {
+  margin-top: 9px; font-family: var(--f-data); font-size: 10.5px; color: var(--muted);
+  display: flex; justify-content: space-between; gap: 8px;
+}
+
+.rel { display: grid; gap: 7px; }
+.rel-row { display: grid; grid-template-columns: 1fr 54px 44px; gap: 8px; align-items: center; font-size: 12px; }
+.rel-row .who { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bipolar { height: 6px; background: var(--surface-2); border-radius: 2px; position: relative; }
+.bipolar span { position: absolute; top: 0; bottom: 0; border-radius: 2px; }
+.rel-row .n { font-family: var(--f-data); font-size: 10.5px; font-variant-numeric: tabular-nums; text-align: right; color: var(--muted); }
+
+.mem { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; }
+.mem li { display: grid; grid-template-columns: 46px 1fr; gap: 9px; font-size: 12px; line-height: 1.4; }
+.mem .t { font-family: var(--f-data); font-size: 10px; color: var(--faint); font-variant-numeric: tabular-nums; padding-top: 1px; }
+.mem .false { color: var(--crit); font-family: var(--f-data); font-size: 10px; }
+
+/* ---------- feed ---------- */
+.feed { grid-area: feed; background: var(--surface); display: flex; flex-direction: column; max-height: 300px; }
+.tabs { display: flex; gap: 4px; }
+.tab {
+  background: transparent; border: 0; border-bottom: 2px solid transparent;
+  padding: 4px 2px; font-family: var(--f-data); font-size: 10.5px;
+  letter-spacing: .08em; text-transform: uppercase; color: var(--muted);
+}
+.tab[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); }
+.feed-body { overflow-y: auto; flex: 1; padding: 4px 0 10px; }
+.ev {
+  display: grid; grid-template-columns: 64px 14px 1fr;
+  gap: 10px; padding: 5px 16px; align-items: baseline;
+  border-left: 2px solid transparent;
+}
+.ev .tk { font-family: var(--f-data); font-size: 10.5px; color: var(--faint); font-variant-numeric: tabular-nums; }
+.ev .vb { font-family: var(--f-data); font-size: 10px; color: var(--muted); }
+.ev .tx { font-size: 12.5px; line-height: 1.45; }
+.ev .tx b { font-weight: 600; }
+.ev.deck { background: var(--surface-2); border-left-color: var(--warn); }
+.ev.deck .tx { font-family: var(--f-data); font-size: 11.5px; }
+.ev.crit { border-left-color: var(--crit); }
+.ev.mine { border-left-color: var(--accent); background: var(--accent-soft); }
+.chron { padding: 14px 18px; max-width: 66ch; }
+.chron p { font-family: var(--f-display); font-size: 15px; line-height: 1.6; margin: 0 0 11px; }
+.chron .drop::first-letter { font-size: 2.6em; float: left; line-height: .84; padding: 3px 7px 0 0; font-weight: 600; }
+.chron .attrib { font-family: var(--f-data); font-size: 10.5px; color: var(--muted); letter-spacing: .04em; }
+
+/* ---------- intervention dock ---------- */
+.dock { grid-area: dock; background: var(--surface); display: flex; flex-direction: column; max-height: 300px; }
+.dock-body { padding: 12px 16px; overflow-y: auto; display: grid; gap: 9px; }
+.iv {
+  display: grid; grid-template-columns: 1fr auto; gap: 3px 10px;
+  border: 1px solid var(--line); border-radius: var(--r);
+  padding: 9px 11px; background: var(--surface);
+  text-align: left; align-items: baseline;
+}
+.iv:hover:not(:disabled) { border-color: var(--accent); }
+.iv:disabled { opacity: .5; cursor: not-allowed; }
+.iv .nm { font-size: 13px; font-weight: 500; }
+.iv .cost { font-family: var(--f-data); font-size: 10.5px; color: var(--accent); font-variant-numeric: tabular-nums; }
+.iv .ds { grid-column: 1 / -1; font-size: 11px; color: var(--muted); line-height: 1.35; }
+.budget {
+  font-family: var(--f-data); font-size: 10.5px; color: var(--muted);
+  display: flex; justify-content: space-between; padding-top: 3px;
+}
+.note-rule {
+  font-size: 11px; color: var(--muted); line-height: 1.45;
+  border-top: 1px dashed var(--line); padding-top: 9px; margin-top: 2px;
+}
+
+@media (max-width: 1180px) {
+  .shell {
+    grid-template-columns: 1fr;
+    grid-template-areas: "top" "stage" "inspector" "roster" "feed" "dock";
+  }
+  .feed, .dock { max-height: none; }
+  .canvas-wrap { min-height: 380px; }
+}
+</style>
+
+<div class="mockup-flag">
+  <strong>Design mockup</strong>
+  <span>Spectator client, milestone M4 — DESIGN.md §8</span>
+  <span>All figures are illustrative sample data</span>
+</div>
+
+<div class="shell playing" id="shell">
+
+  <!-- ================= TOP ================= -->
+  <header class="top">
+    <div class="brand">
+      <h1>Kestrel Basin</h1>
+      <span class="sub">shared world · seed 0x4C1F&thinsp;A930 · build 0.1.7</span>
+    </div>
+
+    <div class="clock">
+      <span class="pulse" aria-hidden="true"></span>
+      <div>
+        <div class="tick-num" id="tickNum">14,208</div>
+        <div class="tick-meta">tick · <span id="worldDate">Year 41, Latter Reap, day 12</span></div>
+      </div>
+    </div>
+
+    <div class="transport">
+      <button class="btn" id="playBtn" aria-pressed="true">Pause</button>
+      <button class="btn small" id="speedBtn">1&times;</button>
+      <span class="tick-meta">10 min real<br>= 1 h world</span>
+    </div>
+
+    <div class="indices" id="indices"></div>
+  </header>
+
+  <!-- ================= ROSTER ================= -->
+  <aside class="roster">
+    <div class="panel-head">
+      <h2>Agents in view</h2>
+      <span class="count">8 of 214</span>
+    </div>
+    <div class="roster-list" id="roster"></div>
+    <div class="panel-head" style="border-top:1px solid var(--line);border-bottom:0">
+      <h2>Yours</h2>
+      <span class="count">1 slot free</span>
+    </div>
+  </aside>
+
+  <!-- ================= STAGE ================= -->
+  <main class="stage">
+    <div class="panel-head">
+      <h2>Lowmarsh &amp; the north weir</h2>
+      <div class="layers" id="layers">
+        <button class="btn small" data-layer="terrain" aria-pressed="true">Terrain</button>
+        <button class="btn small" data-layer="trust" aria-pressed="false">Trust ties</button>
+        <button class="btn small" data-layer="degradation" aria-pressed="false">Depletion</button>
+        <button class="btn small" data-layer="belief" aria-pressed="false">Belief spread</button>
+      </div>
+    </div>
+    <div class="canvas-wrap">
+      <canvas id="map"></canvas>
+      <div class="legend" id="legend">
+        <span><i style="background:var(--t-water)"></i>fen water</span>
+        <span><i style="background:var(--t-meadow)"></i>grazing</span>
+        <span><i style="background:var(--t-wood)"></i>coppice</span>
+        <span><i style="background:var(--t-stone)"></i>scree</span>
+        <span><i style="background:var(--d-curiosity)"></i>agent (by top drive)</span>
+        <span><i style="border:1px solid var(--muted);background:transparent"></i>resource node</span>
+      </div>
+      <div class="scale">40 &times; 26 tiles<br>1 tile ≈ 400 m</div>
+    </div>
+
+    <div class="verbs">
+      <h3>Engine tools — what an agent may do <span style="text-transform:none;letter-spacing:0;font-weight:400">(all authority comes from this schema)</span></h3>
+      <div class="verb-grid" id="verbGrid"></div>
+    </div>
+  </main>
+
+  <!-- ================= INSPECTOR ================= -->
+  <aside class="inspector" id="inspector"></aside>
+
+  <!-- ================= FEED ================= -->
+  <section class="feed">
+    <div class="panel-head">
+      <div class="tabs" role="tablist">
+        <button class="tab" role="tab" aria-selected="true" data-view="events">Event log</button>
+        <button class="tab" role="tab" aria-selected="false" data-view="chronicle">Chronicle</button>
+        <button class="tab" role="tab" aria-selected="false" data-view="deck">Event deck</button>
+      </div>
+      <span class="count" id="feedCount">append-only · replayable</span>
+    </div>
+    <div class="feed-body" id="feedBody"></div>
+  </section>
+
+  <!-- ================= DOCK ================= -->
+  <aside class="dock">
+    <div class="panel-head">
+      <h2>Intervention</h2>
+      <span class="count" id="budgetCount">3 of 5</span>
+    </div>
+    <div class="dock-body">
+      <button class="iv">
+        <span class="nm">Letter</span><span class="cost">1 ⌁</span>
+        <span class="ds">A message reaches Maren by hand. She may believe it, doubt it, or burn it.</span>
+      </button>
+      <button class="iv">
+        <span class="nm">Dream</span><span class="cost">1 ⌁</span>
+        <span class="ds">Nudge one drive weight by ≤ 0.05. No control over content.</span>
+      </button>
+      <button class="iv">
+        <span class="nm">Rumor</span><span class="cost">2 ⌁</span>
+        <span class="ds">Inject a proposition into Lowmarsh's belief network. Not necessarily into your own agent.</span>
+      </button>
+      <button class="iv" disabled>
+        <span class="nm">Gift</span><span class="cost">3 ⌁</span>
+        <span class="ds">Place an object in the world. Insufficient budget — refreshes in 4 h 20 m.</span>
+      </button>
+      <div class="budget"><span>budget refresh</span><span>4 h 20 m</span></div>
+      <p class="note-rule">You author and influence. You never act as your agent. Interventions are logged as exogenous perturbations and excluded from research runs.</p>
+    </div>
+  </aside>
+</div>
+
+<script>
+// ---------------------------------------------------------------- sample data
+const DRIVES = ["survival","status","belonging","curiosity","mastery","autonomy","legacy"];
+
+const AGENTS = [
+  { id:"a1", name:"Maren Ostwald", arch:"Steward", age:44, yours:true, x:17, y:11,
+    drives:[.42,.31,.78,.24,.40,.29,.66], base:[.40,.30,.55,.30,.40,.35,.35],
+    goal:"See the north weir rebuilt before the spring flood.",
+    crit:[["yes","timber secured (94 of 90 beams)"],["yes","masons contracted — 3 of 3"],["no","weir gate hung"],["no","survives one flood season"]],
+    revised:"Revised at t=11,940 after the Beckwith collapse. Previously: <em>“Keep the Ostwald holding intact.”</em>",
+    tags:[["good","goal 62% met"],["","plastic 0.4"]],
+    rel:[["Ilka Venn",.71,"+0.71"],["Doran Pike",-.38,"−0.38"],["Rhoswen Tal",.44,"+0.44"],["Bastian Ordry",.09,"+0.09"]],
+    mem:[["t 14,201","Doran refused grain against the weir debt. Told the mason it was <b>“the last time.”</b>"],
+         ["t 14,166","Ilka delivered nine beams early, unasked."],
+         ["t 13,902","Believes the Beckwith reed-beds failed from frost.",'false'],
+         ["t 11,940","The weir gave. Four holdings under water by dusk."]],
+    drift:.31, last:"work" },
+
+  { id:"a2", name:"Rhoswen Tal", arch:"Scholar", age:31, x:23, y:8,
+    drives:[.28,.36,.30,.88,.72,.51,.38], base:[.40,.30,.40,.60,.55,.40,.30],
+    goal:"Recover the salt-glaze recipe lost in the Quiet Years.",
+    crit:[["yes","three surviving shards located"],["yes","one kiln rebuilt to old plan"],["no","glaze reproduced twice running"]],
+    revised:"Original goal intact since t=0.",
+    tags:[["","goal 41% met"],["","rigid 0.8"]],
+    rel:[["Ilka Venn",.63,"+0.63"],["Maren Ostwald",.44,"+0.44"],["Wick Aldermann",.52,"+0.52"]],
+    mem:[["t 14,205","Taught kiln-tempering to Ilka. First transmission of the technique."],
+         ["t 14,102","The Nine Wells song names a glaze &ldquo;green as standing water.&rdquo;"],
+         ["t 13,780","Third shard found in the scree above Beckwith."]],
+    drift:.18, last:"teach" },
+
+  { id:"a3", name:"Doran Pike", arch:"Broker", age:52, x:14, y:15,
+    drives:[.55,.83,.19,.33,.44,.74,.27], base:[.45,.60,.35,.35,.40,.55,.30],
+    goal:"Hold a debt on every family in Lowmarsh.",
+    crit:[["yes","19 of 26 households indebted"],["no","the Ostwald holding"],["no","no debt forgiven for one year"]],
+    revised:"Original goal intact since t=0.",
+    tags:[["warn","trust −0.31 mean"],["","rigid 0.9"]],
+    rel:[["Maren Ostwald",-.38,"−0.38"],["Sela Marrow",-.62,"−0.62"],["Bastian Ordry",.21,"+0.21"]],
+    mem:[["t 14,201","Refused Maren grain. Judged the weir a poor security."],
+         ["t 14,180","Sela's debt is now three seasons overdue."],
+         ["t 13,455","Nobody came to the reckoning at the Nine Wells."]],
+    drift:.12, last:"give" },
+
+  { id:"a4", name:"Ilka Venn", arch:"Artisan", age:27, x:20, y:12,
+    drives:[.35,.29,.58,.47,.91,.33,.61], base:[.40,.30,.50,.40,.70,.35,.40],
+    goal:"Make one thing that outlives me.",
+    crit:[["yes","kiln raised"],["no","glaze holds through two firings"],["no","the technique passes to another hand"]],
+    revised:"Revised at t=13,640 — narrowed from <em>“become the finest potter in the basin.”</em>",
+    tags:[["good","mastery 0.91"],["","plastic 0.6"]],
+    rel:[["Rhoswen Tal",.63,"+0.63"],["Maren Ostwald",.71,"+0.71"],["Wick Aldermann",.34,"+0.34"]],
+    mem:[["t 14,205","Rhoswen taught kiln-tempering. It changes everything about the second firing."],
+         ["t 14,166","Gave nine beams to the weir. Did not ask payment."],
+         ["t 13,640","The tall jar cracked in cooling. Sat with it until dark."]],
+    drift:.44, last:"craft" },
+
+  { id:"a5", name:"Bastian Ordry", arch:"Zealot", age:38, x:26, y:17,
+    drives:[.31,.68,.72,.22,.35,.41,.79], base:[.40,.45,.55,.30,.35,.40,.50],
+    goal:"Restore the Feast of Nine Wells to its proper season.",
+    crit:[["yes","the old date recovered from the Chronicle"],["no","nine households attend"],["no","held twice running"]],
+    revised:"Original goal intact since t=0.",
+    tags:[["warn","belonging falling"],["","rigid 0.7"]],
+    rel:[["Doran Pike",.21,"+0.21"],["Sela Marrow",.40,"+0.40"],["Maren Ostwald",.09,"+0.09"]],
+    mem:[["t 14,190","Four came to the well. Last year there were eleven."],
+         ["t 13,455","Held the feast alone. Counted it as held."]],
+    drift:.27, last:"speak" },
+
+  { id:"a6", name:"Sela Marrow", arch:"Forager", age:19, x:11, y:9,
+    drives:[.86,.22,.44,.55,.31,.62,.14], base:[.55,.30,.45,.50,.35,.45,.25],
+    goal:"Get through winter without owing Doran anything.",
+    crit:[["no","stores at 40 days"],["yes","no new debt this season"],["no","a roof that is not rented"]],
+    revised:"Revised at t=14,020 — survival drive rose 0.31 over 90 ticks of shortfall.",
+    tags:[["crit","hunger 31 / 40"],["","plastic 0.7"]],
+    rel:[["Doran Pike",-.62,"−0.62"],["Bastian Ordry",.40,"+0.40"],["Wick Aldermann",.58,"+0.58"]],
+    mem:[["t 14,196","The Beckwith reed-beds are cut to nothing. Took what was left."],
+         ["t 14,180","Doran counted the debt aloud in front of others."]],
+    drift:.52, last:"take" },
+
+  { id:"a7", name:"Cael Iversson", arch:"Wanderer", age:35, x:31, y:5,
+    drives:[.48,.25,.21,.93,.38,.81,.30], base:[.45,.30,.35,.65,.35,.60,.25],
+    goal:"Find where the Ash Road ends.",
+    crit:[["yes","past the third milestone"],["no","the road's end reached"],["no","a map of it left behind"]],
+    revised:"Original goal intact since t=0.",
+    tags:[["","out of contact 46 ticks"],["","rigid 0.6"]],
+    rel:[["Wick Aldermann",.29,"+0.29"],["Rhoswen Tal",.18,"+0.18"]],
+    mem:[["t 14,162","Left a message cut into the milestone. For whoever comes after."],
+         ["t 14,003","The road is older than the basin's memory of it."]],
+    drift:.09, last:"leave_message" },
+
+  { id:"a8", name:"Wick Aldermann", arch:"Wanderer", age:12, x:19, y:14,
+    drives:[.61,.18,.69,.77,.28,.35,.11], base:[.50,.25,.60,.65,.30,.35,.20],
+    goal:"Be taken seriously by the potters.",
+    crit:[["yes","allowed near the kiln"],["no","given work to do"],["no","named in the Chronicle"]],
+    revised:"Goal acquired at t=13,990 — absorbed from Ilka, not authored.",
+    tags:[["good","goal inherited"],["","plastic 0.9"]],
+    rel:[["Ilka Venn",.34,"+0.34"],["Sela Marrow",.58,"+0.58"],["Rhoswen Tal",.52,"+0.52"]],
+    mem:[["t 14,207","Watched the tempering through the door and said nothing."],
+         ["t 13,990","Decided the kiln was the most important thing in the basin."]],
+    drift:.66, last:"observe" }
+];
+
+const INDICES = [
+  ["Population","214",["flat","0"]],
+  ["Knowledge depth","7",["up","+1"]],
+  ["Knowledge breadth","2.4",["up","+0.3"]],
+  ["Institutions","3",["flat","0"]],
+  ["Norm compliance","0.62",["down","−0.04"]],
+  ["Gini","0.41",["up","+0.02"]],
+  ["Goal attainment","0.19",["up","+0.01"]],
+  ["Drive entropy","2.31",["down","−0.08"]]
+];
+
+const VERBS = [
+  ["move(target)","stepping toward the weir"],
+  ["observe(target?)","free, every tick"],
+  ["work(site)","last used t 14,204"],
+  ["take(item)","—"],
+  ["give(to, item)","—"],
+  ["craft(recipe)","no recipe known"],
+  ["speak(to, content)","last used t 14,201"],
+  ["teach(to, knowledge)","nothing to teach"],
+  ["form_bond(with, kind)","—"],
+  ["leave_message(place)","—"],
+  ["remember(query)","free, salience-ranked"],
+  ["plan(horizon)","escalates to tier 2"]
+];
+const ACTIVE_VERB = "work(site)";
+const LOCKED_VERBS = ["craft(recipe)","teach(to, knowledge)"];
+
+const EVENTS = [
+  ["14,208","work","<b>Maren</b> hauled stone to the north weir. Beams 94 / 90.","mine"],
+  ["14,207","observe","<b>Wick</b> watched the tempering from the doorway. Said nothing.",""],
+  ["14,205","teach","<b>Rhoswen</b> taught kiln-tempering to <b>Ilka</b>. Knowledge breadth 2.1 → 2.4.",""],
+  ["14,204","deck","LATE FROST drawn — weighted by 3 consecutive dry seasons. Valence: 6 harmed, 2 helped, 206 unaffected.","deck"],
+  ["14,201","speak","<b>Doran</b> refused grain to <b>Maren</b> against the weir debt. Trust −0.14 → −0.38.","crit"],
+  ["14,196","take","<b>Sela</b> harvested the Beckwith reed-beds at 22% stock. Regen rate −38%.","crit"],
+  ["14,190","—","Feast of Nine Wells: 4 attended. <b>Bastian</b> belonging drive −0.06.",""],
+  ["14,188","give","<b>Ilka</b> gave nine beams to the weir, unasked. No debt recorded.",""],
+  ["14,181","move","<b>Cael</b> passed the third milestone on the Ash Road. Out of contact.",""],
+  ["14,180","speak","<b>Doran</b> named <b>Sela</b>'s debt in public. Status +0.03, trust −0.24 across 5 ties.",""],
+  ["14,166","give","<b>Ilka</b> delivered beams early. <b>Maren</b> belonging +0.04.",""],
+  ["14,162","leave_message","<b>Cael</b> cut a message into the milestone. Readable by any agent passing.",""]
+];
+
+const DECK = [
+  ["14,204","LATE FROST","drawn","p 0.11 → 0.19 after 3 dry seasons"],
+  ["14,090","GOOD CUT","drawn","p 0.14 · 4 helped, 1 harmed"],
+  ["13,940","FEVER","held","p 0.08 · suppressed, density below threshold"],
+  ["13,655","FINDING","drawn","p 0.06 → 0.13 after sustained exploration"],
+  ["11,940","THE WEIR GAVE","drawn","p 0.03 → 0.22 after 200 ticks deferred repair"]
+];
+
+const CHRONICLE = `<p class="drop">The frost came late and took the second cutting, which in Lowmarsh is the cutting that matters. Six households counted the loss; two counted a gain, because the reed-beds froze hard enough to walk on and Sela Marrow walked on them.</p>
+<p>Up at the weir, Maren Ostwald had ninety beams promised and ninety-four delivered, four of them from a potter who did not ask to be paid and did not say why. She has stopped saying the word <em>spring</em> where the masons can hear it.</p>
+<p>In the kiln shed, Rhoswen Tal taught a thing to Ilka Venn that nobody in the basin has known for forty-one years, and a twelve-year-old watched it happen through a gap in the door.</p>
+<p class="attrib">Chronicle, tick 14,140–14,208 · threaded from 31 high-salience events</p>`;
+
+// ---------------------------------------------------------------- render
+const $ = (s) => document.querySelector(s);
+const css = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const driveColor = (i) => css("--d-" + DRIVES[i]);
+const topDrive = (a) => a.drives.indexOf(Math.max(...a.drives));
+
+let selected = AGENTS[0];
+let layers = { terrain:true, trust:false, degradation:false, belief:false };
+
+$("#indices").innerHTML = INDICES.map(([k,v,[dir,d]]) => `
+  <div class="idx"><span class="k">${k}</span>
+    <span class="v">${v}<span class="delta ${dir}">${d}</span></span></div>`).join("");
+
+$("#verbGrid").innerHTML = VERBS.map(([sig,note]) => {
+  const cls = sig === ACTIVE_VERB ? "verb active" : LOCKED_VERBS.includes(sig) ? "verb locked" : "verb";
+  return `<div class="${cls}"><span class="sig">${sig}</span><span class="note">${note}</span></div>`;
+}).join("");
+
+function renderRoster() {
+  $("#roster").innerHTML = AGENTS.map(a => `
+    <button class="row" data-id="${a.id}" aria-current="${a.id === selected.id}">
+      <span class="dot" style="background:${driveColor(topDrive(a))}"></span>
+      <span><span class="nm">${a.name}${a.yours ? " ◆" : ""}</span><br><span class="ar">${a.arch} · ${a.age}</span></span>
+      <span class="st">drift<br>${a.drift.toFixed(2)}</span>
+    </button>`).join("");
+}
+
+function renderInspector() {
+  const a = selected;
+  const drives = a.drives.map((v,i) => `
+    <div class="drive">
+      <span class="lb">${DRIVES[i]}</span>
+      <span class="track"><span class="fill" style="width:${v*100}%;background:${driveColor(i)}"></span><span class="base" style="left:${a.base[i]*100}%"></span></span>
+      <span class="nv">${v.toFixed(2)}</span>
+    </div>`).join("");
+
+  const rel = a.rel.map(([who,v,label]) => {
+    const w = Math.abs(v) * 50, left = v >= 0 ? 50 : 50 - w;
+    const c = v >= 0 ? css("--good") : css("--crit");
+    return `<div class="rel-row"><span class="who">${who}</span>
+      <span class="bipolar"><span style="left:${left}%;width:${w}%;background:${c}"></span></span>
+      <span class="n">${label}</span></div>`;
+  }).join("");
+
+  $("#inspector").innerHTML = `
+    <div class="ins-id">
+      <h2>${a.name}</h2>
+      <div class="meta">${a.arch} · age ${a.age} · ${a.yours ? "authored by you" : "another player's agent"}</div>
+      <div class="tags">${a.tags.map(([k,t]) => `<span class="tag ${k}">${t}</span>`).join("")}</div>
+    </div>
+
+    <div class="sec">
+      <h3>Private goal <span style="text-transform:none;letter-spacing:0">— not visible to other agents</span></h3>
+      <p class="goal">${a.goal}</p>
+      <ul class="crit-list">${a.crit.map(([m,t]) =>
+        `<li><span class="mark ${m === "yes" ? "" : "no"}">${m === "yes" ? "✓" : "○"}</span><span>${t}</span></li>`).join("")}</ul>
+      <p class="revised">${a.revised}</p>
+    </div>
+
+    <div class="sec">
+      <h3>Drive vector <span style="text-transform:none;letter-spacing:0">— engine-mutated, hairline = archetype baseline</span></h3>
+      <div class="drives">${drives}</div>
+      <div class="drift"><span>drift from t₀ (cosine)</span><span>${a.drift.toFixed(2)}</span></div>
+    </div>
+
+    <div class="sec">
+      <h3>Relationships</h3>
+      <div class="rel">${rel}</div>
+    </div>
+
+    <div class="sec" style="border-bottom:0">
+      <h3>Memory <span style="text-transform:none;letter-spacing:0">— salience-ranked, decaying</span></h3>
+      <ul class="mem">${a.mem.map(m =>
+        `<li><span class="t">${m[0]}</span><span>${m[1]}${m[2] ? ' <span class="false">[false belief]</span>' : ""}</span></li>`).join("")}</ul>
+    </div>`;
+}
+
+let feedView = "events";
+function renderFeed() {
+  const el = $("#feedBody");
+  if (feedView === "chronicle") { el.innerHTML = `<div class="chron">${CHRONICLE}</div>`; return; }
+  if (feedView === "deck") {
+    el.innerHTML = DECK.map(([tk,nm,st,note]) => `
+      <div class="ev ${st === "drawn" ? "deck" : ""}">
+        <span class="tk">t ${tk}</span><span class="vb">${st === "drawn" ? "▲" : "·"}</span>
+        <span class="tx"><b>${nm}</b> — ${note}</span></div>`).join("");
+    return;
+  }
+  el.innerHTML = EVENTS.map(([tk,vb,tx,cls]) => `
+    <div class="ev ${cls}"><span class="tk">t ${tk}</span><span class="vb">${vb === "deck" ? "▲" : "·"}</span>
+      <span class="tx">${tx}</span></div>`).join("");
+}
+
+// ---------------------------------------------------------------- map
+const cvs = $("#map"), ctx = cvs.getContext("2d");
+const COLS = 40, ROWS = 26;
+
+function hash(x, y) {
+  let h = x * 374761393 + y * 668265263 + 0x4C1FA930;
+  h = (h ^ (h >> 13)) * 1274126177;
+  return ((h ^ (h >> 16)) >>> 0) / 4294967296;
+}
+function smooth(x, y) {
+  let t = 0, amp = 1, f = 0.18, tot = 0;
+  for (let o = 0; o < 3; o++) {
+    const xi = Math.floor(x * f), yi = Math.floor(y * f);
+    const fx = x * f - xi, fy = y * f - yi;
+    const a = hash(xi, yi), b = hash(xi + 1, yi), c = hash(xi, yi + 1), d = hash(xi + 1, yi + 1);
+    const u = fx * fx * (3 - 2 * fx), v = fy * fy * (3 - 2 * fy);
+    t += (a * (1 - u) * (1 - v) + b * u * (1 - v) + c * (1 - u) * v + d * u * v) * amp;
+    tot += amp; amp *= 0.5; f *= 2.1;
+  }
+  return t / tot;
+}
+function terrainAt(x, y) {
+  const n = smooth(x, y);
+  const river = Math.abs(y - (9 + Math.sin(x * 0.28) * 3.4)) < 1.1;
+  if (river || n < 0.34) return "water";
+  if (n < 0.42) return "marsh";
+  if (n < 0.60) return "meadow";
+  if (n < 0.74) return "wood";
+  return "stone";
+}
+
+const NODES = [
+  { n:"Beckwith reed-beds", x:12, y:9,  stock:.22, deg:.55 },
+  { n:"Weir coppice",       x:18, y:12, stock:.71, deg:.05 },
+  { n:"Lowmarsh commons",   x:15, y:15, stock:.48, deg:.20 },
+  { n:"Ordry orchard",      x:26, y:17, stock:.83, deg:.00 },
+  { n:"Scree quarry",       x:30, y:6,  stock:.94, deg:.00 },
+  { n:"Tal kiln clay",      x:23, y:9,  stock:.61, deg:.10 }
+];
+
+function drawMap() {
+  const dpr = window.devicePixelRatio || 1;
+  const w = cvs.clientWidth, h = cvs.clientHeight;
+  cvs.width = w * dpr; cvs.height = h * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const tw = w / COLS, th = h / ROWS;
+
+  ctx.fillStyle = css("--surface-2");
+  ctx.fillRect(0, 0, w, h);
+
+  for (let y = 0; y < ROWS; y++) {
+    for (let x = 0; x < COLS; x++) {
+      ctx.fillStyle = css("--t-" + terrainAt(x, y));
+      ctx.globalAlpha = layers.terrain ? 1 : 0.25;
+      ctx.fillRect(Math.floor(x * tw), Math.floor(y * th), Math.ceil(tw) + 1, Math.ceil(th) + 1);
+    }
+  }
+  ctx.globalAlpha = 1;
+
+  // resource nodes
+  NODES.forEach(nd => {
+    const cx = (nd.x + .5) * tw, cy = (nd.y + .5) * th, r = Math.min(tw, th) * 1.15;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - r); ctx.lineTo(cx + r, cy); ctx.lineTo(cx, cy + r); ctx.lineTo(cx - r, cy);
+    ctx.closePath();
+    if (layers.degradation && nd.deg > 0.15) {
+      ctx.fillStyle = css("--crit"); ctx.globalAlpha = 0.25 + nd.deg * 0.6;
+    } else {
+      ctx.fillStyle = css("--surface"); ctx.globalAlpha = 0.55 + nd.stock * 0.4;
+    }
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = nd.deg > 0.4 ? css("--crit") : css("--muted");
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  });
+
+  // trust ties
+  if (layers.trust) {
+    ctx.lineWidth = 1.4;
+    AGENTS.forEach(a => a.rel.forEach(([who, v]) => {
+      const b = AGENTS.find(z => z.name === who);
+      if (!b || b.id < a.id) return;
+      ctx.beginPath();
+      ctx.moveTo((a.x + .5) * tw, (a.y + .5) * th);
+      ctx.lineTo((b.x + .5) * tw, (b.y + .5) * th);
+      ctx.strokeStyle = v >= 0 ? css("--good") : css("--crit");
+      ctx.globalAlpha = 0.25 + Math.abs(v) * 0.55;
+      ctx.stroke();
+    }));
+    ctx.globalAlpha = 1;
+  }
+
+  // agents
+  AGENTS.forEach(a => {
+    const cx = (a.x + .5) * tw, cy = (a.y + .5) * th;
+    const believer = layers.belief && ["a1","a4","a8"].includes(a.id);
+    if (a.id === selected.id || believer) {
+      ctx.beginPath(); ctx.arc(cx, cy, 11, 0, Math.PI * 2);
+      ctx.strokeStyle = believer && a.id !== selected.id ? css("--warn") : css("--accent");
+      ctx.lineWidth = 1.6; ctx.stroke();
+    }
+    ctx.beginPath(); ctx.arc(cx, cy, 5.2, 0, Math.PI * 2);
+    ctx.fillStyle = driveColor(topDrive(a)); ctx.fill();
+    ctx.strokeStyle = css("--surface"); ctx.lineWidth = 1.6; ctx.stroke();
+  });
+
+  // selected label
+  const s = selected;
+  ctx.font = '500 11px "IBM Plex Mono", monospace';
+  ctx.fillStyle = css("--ink");
+  ctx.fillText(s.name, (s.x + .5) * tw + 14, (s.y + .5) * th + 4);
+}
+
+// ---------------------------------------------------------------- interaction
+$("#roster").addEventListener("click", e => {
+  const row = e.target.closest(".row");
+  if (!row) return;
+  selected = AGENTS.find(a => a.id === row.dataset.id);
+  renderRoster(); renderInspector(); drawMap();
+});
+
+$("#layers").addEventListener("click", e => {
+  const b = e.target.closest("[data-layer]");
+  if (!b) return;
+  const on = b.getAttribute("aria-pressed") !== "true";
+  b.setAttribute("aria-pressed", String(on));
+  layers[b.dataset.layer] = on;
+  drawMap();
+});
+
+document.querySelectorAll(".tab").forEach(t => t.addEventListener("click", () => {
+  document.querySelectorAll(".tab").forEach(x => x.setAttribute("aria-selected", String(x === t)));
+  feedView = t.dataset.view;
+  renderFeed();
+}));
+
+const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+let tick = 14208, playing = !reduced, timer = null, speed = 1;
+
+function step() {
+  tick += 1;
+  $("#tickNum").textContent = tick.toLocaleString();
+  if (tick % 3 === 0) {
+    const a = AGENTS[tick % AGENTS.length];
+    a.x = Math.max(1, Math.min(COLS - 2, a.x + (hash(a.x, tick) > .5 ? 1 : -1)));
+    a.y = Math.max(1, Math.min(ROWS - 2, a.y + (hash(tick, a.y) > .5 ? 1 : -1)));
+    drawMap();
+  }
+}
+function setPlaying(p) {
+  playing = p;
+  $("#shell").classList.toggle("playing", p);
+  $("#playBtn").textContent = p ? "Pause" : "Play";
+  $("#playBtn").setAttribute("aria-pressed", String(p));
+  clearInterval(timer);
+  if (p) timer = setInterval(step, 1400 / speed);
+}
+$("#playBtn").addEventListener("click", () => setPlaying(!playing));
+$("#speedBtn").addEventListener("click", () => {
+  speed = speed === 1 ? 4 : speed === 4 ? 16 : 1;
+  $("#speedBtn").textContent = speed + "×";
+  if (playing) setPlaying(true);
+});
+
+window.addEventListener("resize", drawMap);
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", drawMap);
+
+renderRoster(); renderInspector(); renderFeed();
+requestAnimationFrame(() => { drawMap(); setPlaying(playing); });
+</script>

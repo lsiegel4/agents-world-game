@@ -162,6 +162,16 @@ Each event has a `valence_distribution` across affected agents — deliberately 
 flood ruins a farmer and enriches a salvager. No event is globally good or globally bad.
 Events are never targeted at "whoever is winning"; there is no winning.
 
+**Mortality is not only starvation.** The deck carries sickness, injury, exposure and
+disaster as death causes independent of an agent's resource position. This matters
+mechanically as well as narratively: when the only way to die is to run out of food,
+population becomes a pure feedback loop on the commons, and the world turns bistable —
+either it holds or it ratchets into collapse, with nothing in between. M0 demonstrated
+exactly that (see README). Stochastic mortality decouples death from the resource
+ratchet and is what makes a population dynamic rather than a thermostat. Death from the
+deck is also the honest case: most people, most of the time, do not die of their own
+strategy.
+
 ---
 
 ## 5. Agent model
@@ -434,6 +444,19 @@ The sim produces an event stream; the spectator needs a narrative. Components:
 - **Instruments view** — the index dashboard from §7. This is the research face and it
   is also, for the right audience, the most compelling screen in the product.
 
+
+**Constraints carried from the first mockup review (2026-09-04):**
+
+- **Progressive disclosure is a requirement, not a polish pass.** The full console is
+  legible to the designer and cluttered to a new viewer. Default view shows one agent,
+  the map, and the Chronicle; indices, drive vectors, deck probabilities and trust
+  layers are opt-in. The instrument view (§7) is a separate mode, not a always-on strip.
+- **Motion carries the premise.** A still map understates that the world runs unattended.
+  Animation and rendering fidelity are a real part of whether M4 lands, not decoration —
+  revisit the deferred-engine call in §9 once the sim is proven.
+- Mechanics as mocked (drives, deck, interventions, tools) are confirmed directionally;
+  layer onto them rather than restructure.
+
 ---
 
 ## 9. Technical architecture
@@ -536,3 +559,14 @@ Closed alpha of sandbox mode.
 - Whether the intervention economy corrupts the research value of shared-world data
   beyond the "observational only" caveat.
 - Whether goal attainment should ever be visible to other agents, or only inferrable.
+- **The tool schema in §5.5 contains no verb for violence, theft, or coercion.** Since
+  agents can do exactly what the schema permits (§2.5), this is not a neutral omission:
+  it is §7.5's threat #2 in its strongest form. A world that cannot express harm will
+  report cooperation, norm compliance, and trust-network density that are artifacts of
+  the ontology rather than findings about the world. Either add the verbs — `coerce`,
+  `steal`, `harm` — with the enforcement, reputation, and moderation consequences they
+  drag in, or state plainly in every result that the measured cooperation is cooperation
+  *among agents who were never able to defect physically*. The second option is cheap
+  and honest; the first is what makes §7.1's norm-compliance index mean anything, since
+  a norm nobody can break is not a norm. Decide before M2, because it changes what the
+  first ablation study is measuring.
