@@ -16,12 +16,11 @@ need M1's social verbs are listed in UNAVAILABLE rather than approximated.
 from . import stats
 
 UNAVAILABLE = {
-    "giving_rate":                 "needs `give` between agents (M1)",
-    "teaching_rate":               "needs `teach` (M1)",
-    "information_sharing_rate":    "needs `speak` (M1)",
-    "coalition_participation":     "needs `form_bond` (M1)",
-    "defection_rate_when_unobserved": "needs norms and a verb that breaks them (§12)",
-    "commitment_keeping_rate":     "needs commitments (M1)",
+    "giving_rate":              "needs `give` between agents (M1)",
+    "teaching_rate":            "needs `teach` (M1)",
+    "information_sharing_rate": "needs `speak` (M1)",
+    "coalition_participation":  "needs `form_bond` (M1)",
+    "commitment_keeping_rate":  "needs commitments (M1)",
 }
 
 
@@ -51,6 +50,10 @@ def build(log, policy_window: int = POLICY_WINDOW) -> dict:
                 "d_food": r.get("d_food", -1),
                 "d_wood": r.get("d_wood", -1),
                 "born_tick": r["tick"],
+                "restraint_at_t0": r.get("restraint", 0.0),
+                "victimized": 0,
+                "retaliations": 0,
+                "wronged_by": set(),
                 "verbs": {},
                 "early": {},
                 "n_early": 0,
@@ -66,6 +69,14 @@ def build(log, policy_window: int = POLICY_WINDOW) -> dict:
         elif kind == "action":
             a = agents.get(r["agent"])
             if a is not None:
+                if r["verb"] in ("steal", "harm"):
+                    victim = agents.get(r.get("target"))
+                    if victim is not None:
+                        victim["victimized"] += 1
+                        victim["wronged_by"].add(r["agent"])
+                    # Retaliation: harming someone who wronged you first.
+                    if r.get("target") in a["wronged_by"]:
+                        a["retaliations"] += 1
                 a["verbs"][r["verb"]] = a["verbs"].get(r["verb"], 0) + 1
                 if a["n_early"] < policy_window:
                     a["early"][r["verb"]] = a["early"].get(r["verb"], 0) + 1
@@ -96,6 +107,11 @@ def build(log, policy_window: int = POLICY_WINDOW) -> dict:
         total = sum(a["verbs"].values()) or 1
         a["n_actions"] = total
         early_total = a["n_early"] or 1
+        violent = a["verbs"].get("steal", 0) + a["verbs"].get("harm", 0)
+        a["theft_rate"] = a["verbs"].get("steal", 0) / total
+        a["harm_rate"] = a["verbs"].get("harm", 0) / total
+        a["retaliation_rate"] = a["retaliations"] / violent if violent else 0.0
+        a["wronged_by"] = len(a["wronged_by"])
         for verb in ("work", "move", "eat", "repair", "reproduce", "idle"):
             a[f"{verb}_share"] = a["early"].get(verb, 0) / early_total
         # Low entropy = an agent that did one thing. Early window only.

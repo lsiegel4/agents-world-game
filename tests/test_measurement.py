@@ -55,16 +55,59 @@ class TestIndices(unittest.TestCase):
         world, log = run(3, 1000)
         vec = indices.vector(world, log)
         self.assertEqual(set(vec), {"population", "material_output", "inequality",
-                                    "drive_diversity", "life_expectancy"})
+                                    "drive_diversity", "life_expectancy",
+                                    "violence_rate", "mean_restraint",
+                                    "norm_compliance"})
         self.assertGreaterEqual(vec["inequality"], 0.0)
         self.assertLessEqual(vec["inequality"], 1.0)
         self.assertGreaterEqual(vec["drive_diversity"], 0.0)
         self.assertLessEqual(vec["drive_diversity"], 1.0)
 
     def test_unmeasurable_indices_are_declared_not_faked(self):
-        for key in ("knowledge_depth", "norm_compliance", "goal_attainment"):
+        for key in ("knowledge_depth", "trust_network", "goal_attainment"):
             self.assertIn(key, indices.UNAVAILABLE)
             self.assertNotIn(key, indices.vector(*run(1, 200)))
+
+
+class TestViolence(unittest.TestCase):
+    def test_restraint_is_inherited_not_reset(self):
+        """§5.6 upbringing: a child starts near its parent's *current* restraint,
+        not at the archetype baseline."""
+        world, log = run(7, 3000)
+        by_id = {a.id: a for a in world.agents}
+        checked = 0
+        for r in log.records:
+            if r["kind"] != "birth":
+                continue
+            child, parent = by_id.get(r["agent"]), by_id.get(r["parent"])
+            if child is None or parent is None:
+                continue
+            self.assertEqual(child.restraint_base, parent.restraint_base)
+            checked += 1
+        self.assertGreater(checked, 0)
+
+    def test_restraint_stays_in_range(self):
+        world, _ = run(7, 3000)
+        for a in world.agents:
+            self.assertGreaterEqual(a.restraint, 0.0)
+            self.assertLessEqual(a.restraint, 1.0)
+
+    def test_violence_can_be_ablated(self):
+        _, on = run(11, 3000, {"violence": True})
+        _, off = run(11, 3000, {"violence": False})
+        viol = lambda lg: sum(1 for r in lg.records
+                              if r["kind"] == "action" and r["verb"] in ("steal", "harm"))
+        self.assertEqual(viol(off), 0)
+        self.assertGreater(viol(on), 0)
+
+    def test_norm_compliance_needs_opportunity(self):
+        """The denominator must be agent-ticks where violence was possible.
+        Conditioning on all actions makes the observed/unobserved arms
+        non-comparable, because proximity produces both targets and witnesses."""
+        _, log = run(7, 3000)
+        for r in log.records:
+            if r["kind"] == "action" and r["verb"] in ("steal", "harm"):
+                self.assertGreaterEqual(r.get("opp", 0), 1)
 
 
 class TestProfiles(unittest.TestCase):

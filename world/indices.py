@@ -17,10 +17,11 @@ UNAVAILABLE = {
     "knowledge_depth":    "no technique graph until `craft`/`teach` land in M1",
     "knowledge_breadth":  "no knowledge transmission until `teach` lands in M1",
     "institution_density": "no multi-agent structures until `form_bond` lands in M1",
-    "norm_compliance":    "no norms, and no verb an agent could break one with (§12)",
     "trust_network":      "no relationship state until agents can `speak` (M1)",
     "goal_attainment":    "agents have drives but no private goals until M1",
 }
+
+VIOLENT_VERBS = ("steal", "harm")
 
 
 def population(world: World) -> int:
@@ -65,6 +66,53 @@ def deaths_by_cause(log) -> dict:
     return out
 
 
+def norm_compliance(log) -> float:
+    """§7.1: the defection rate when unobserved, minus the rate when observed.
+
+    Positive means agents defect disproportionately when nobody is watching —
+    the norm is being *complied with* under observation rather than internalized.
+    Zero means being seen makes no difference. This is only a real measurement
+    because §5.6 makes inhibition scale with witnesses *and* with restraint, so
+    the differential is produced by agents rather than asserted by the metric.
+
+    Returns None when there is not enough defection to estimate from.
+    """
+    obs_acts = obs_viol = unobs_acts = unobs_viol = 0
+    for r in log.records:
+        if r["kind"] != "action":
+            continue
+        # Only agent-ticks where violence was actually possible count.
+        if r.get("opp", 0) < 1:
+            continue
+        # Discount the prospective victim from the witness count — see
+        # brain.candidates. "Observed" means a bystander beyond the target.
+        seen = (r.get("w", 0) - 1) > 0
+        violent = r["verb"] in VIOLENT_VERBS
+        if seen:
+            obs_acts += 1
+            obs_viol += violent
+        else:
+            unobs_acts += 1
+            unobs_viol += violent
+
+    if obs_viol + unobs_viol < 10 or not obs_acts or not unobs_acts:
+        return None
+    return (unobs_viol / unobs_acts) - (obs_viol / obs_acts)
+
+
+def violence_rate(log) -> float:
+    """Violent acts per 1000 actions."""
+    acts = [r for r in log.records if r["kind"] == "action"]
+    if not acts:
+        return 0.0
+    return sum(1 for r in acts if r["verb"] in VIOLENT_VERBS) / len(acts) * 1000.0
+
+
+def mean_restraint(world: World) -> float:
+    live = world.living_agents()
+    return stats.mean([a.restraint for a in live]) if live else 0.0
+
+
 def vector(world: World, log) -> dict:
     """The measurable slice of §7.1. Report it whole — a world can rise in
     material output while collapsing in diversity, and that tradeoff is the
@@ -75,6 +123,9 @@ def vector(world: World, log) -> dict:
         "inequality": round(inequality(world), 4),
         "drive_diversity": round(drive_diversity(world), 4),
         "life_expectancy": round(life_expectancy(log), 1),
+        "violence_rate": round(violence_rate(log), 3),
+        "mean_restraint": round(mean_restraint(world), 4),
+        "norm_compliance": norm_compliance(log),
     }
 
 

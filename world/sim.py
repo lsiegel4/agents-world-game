@@ -10,9 +10,14 @@ from . import actions, deck, indices
 from .genesis import BASELINE_DRIVES, make_world
 from .log import EventLog
 from .state import (
+    GRUDGE_DECAY,
     HUNGER_PER_TICK,
+    INTERACT_RADIUS,
+    RESTRAINT_HUNGER_EROSION,
+    RESTRAINT_RECOVERY,
     SHELTER_DECAY,
     STARVATION_THRESHOLD,
+    WITNESS_RADIUS,
     World,
 )
 
@@ -27,6 +32,7 @@ DEFAULT_CONFIG = {
     "start_food": 6,
     "founder_max_age": 140,
     "deck": True,          # set False for the §7.3 no-deck ablation arm
+    "violence": True,      # set False for the no-defection ablation arm
     "deck_scale": 1.0,
     "snapshot_every": 25,
 }
@@ -64,24 +70,58 @@ def update_drives(agent, verb: str) -> None:
         d[k] = round(d[k], 6)
 
 
-def apply(world: World, agent, verb: str, params: dict, rng, log) -> None:
+def apply(world: World, agent, verb: str, params: dict, rng, log, w: int = 0, opp: int = 0) -> None:
     if verb == "move":
-        actions.move(world, agent, params["node_id"], log)
+        actions.move(world, agent, params["node_id"], log, w, opp)
     elif verb == "work":
-        actions.work(world, agent, params["node_id"], log)
+        actions.work(world, agent, params["node_id"], log, w, opp)
     elif verb == "eat":
-        actions.eat(world, agent, log)
+        actions.eat(world, agent, log, w, opp)
     elif verb == "repair":
-        actions.repair(world, agent, log)
+        actions.repair(world, agent, log, w, opp)
     elif verb == "reproduce":
-        actions.reproduce(world, agent, rng, log)
+        actions.reproduce(world, agent, rng, log, w, opp)
+    elif verb == "steal":
+        actions.steal(world, agent, params["target_id"], log, w, opp)
+    elif verb == "harm":
+        actions.harm(world, agent, params["target_id"], rng, log, w, opp)
     else:
-        actions.idle(world, agent, log)
+        actions.idle(world, agent, log, w, opp)
+
+
+def surroundings(world: World, agent) -> tuple:
+    """(witnesses within sight, agents within reach) for this agent, right now."""
+    w = opp = 0
+    for other in world.living_agents():
+        if other is agent:
+            continue
+        d = max(abs(other.x - agent.x), abs(other.y - agent.y))
+        if d <= WITNESS_RADIUS:
+            w += 1
+        if d <= INTERACT_RADIUS:
+            opp += 1
+    return w, opp
+
+
+def update_restraint(agent) -> None:
+    """Environment half of §5.6. Sustained hunger pulls the target down; the
+    value relaxes back toward it, so an agent who comes through a hard season
+    recovers rather than staying permanently disinhibited."""
+    hunger_norm = min(1.0, agent.hunger / STARVATION_THRESHOLD)
+    target = agent.restraint_base - RESTRAINT_HUNGER_EROSION * hunger_norm
+    agent.restraint = max(0.0, min(1.0,
+        agent.restraint + RESTRAINT_RECOVERY * (target - agent.restraint)))
+    for other_id in list(agent.grudges):
+        agent.grudges[other_id] -= GRUDGE_DECAY
+        if agent.grudges[other_id] <= 0:
+            del agent.grudges[other_id]
 
 
 def step(world: World, rng, log, deck_rng=None, cfg=None) -> None:
     from . import brain
     world.tick += 1
+
+    violence = bool(cfg.get("violence", True)) if cfg else True
 
     for agent in world.living_agents():
         agent.age += 1
@@ -89,9 +129,15 @@ def step(world: World, rng, log, deck_rng=None, cfg=None) -> None:
         # An unsheltered agent burns through food faster. This is what keeps the
         # wood economy and the food economy in genuine competition.
         agent.hunger += HUNGER_PER_TICK * agent.exposure()
-        verb, params = brain.choose(world, agent, rng)
-        apply(world, agent, verb, params, rng, log)
+        # Both counts are taken live, immediately before this agent acts, not
+        # from a tick-start snapshot: agents move within a tick, so a snapshot
+        # denominator and a decision-time numerator measure different worlds and
+        # the norm-compliance ratio is computed over mismatched arms.
+        w, opp = surroundings(world, agent)
+        verb, params = brain.choose(world, agent, rng, w, violence)
+        apply(world, agent, verb, params, rng, log, w, opp)
         update_drives(agent, verb)
+        update_restraint(agent)
 
         if agent.hunger >= STARVATION_THRESHOLD:
             agent.alive = False
@@ -122,7 +168,7 @@ def run(seed: int, ticks: int, config: dict = None):
     ]
     world = make_world(seed, cfg)
     for agent in world.agents:
-        log.emit(0, "spawn", agent=agent.id, generation=0,
+        log.emit(0, "spawn", agent=agent.id, generation=0, restraint=agent.restraint,
                  x=agent.x, y=agent.y, age=agent.age,
                  food=agent.has("food"), drives=dict(agent.drives),
                  # Distance to the nearest node of each kind is the spatial half

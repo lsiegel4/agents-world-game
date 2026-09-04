@@ -20,7 +20,8 @@ from world import indices, profiles, stats
 from world.sim import run
 
 INDEX_KEYS = ["population", "material_output", "inequality",
-              "drive_diversity", "life_expectancy"]
+              "drive_diversity", "life_expectancy",
+              "violence_rate", "mean_restraint"]
 
 
 def collect(seeds: int, ticks: int, config: dict = None) -> dict:
@@ -86,6 +87,55 @@ def cmd_attribution(args):
         print(f"    {k:<32} {why}")
 
 
+def cmd_violence(args):
+    """Pooled violence analysis. Norm compliance needs more defections than one
+    seed produces, so the arms are pooled across seeds before the ratio."""
+    obs_acts = obs_viol = unobs_acts = unobs_viol = 0
+    killed = victim_restraint = 0
+    perp_restraint, all_restraint = [], []
+    retaliations = violent_total = 0
+
+    for seed in range(args.seeds):
+        _, log = run(seed, args.ticks)
+        for r in log.records:
+            if r["kind"] == "action" and r.get("opp", 0) >= 1:
+                violent = r["verb"] in indices.VIOLENT_VERBS
+                if (r.get("w", 0) - 1) > 0:
+                    obs_acts += 1
+                    obs_viol += violent
+                else:
+                    unobs_acts += 1
+                    unobs_viol += violent
+                if violent:
+                    perp_restraint.append(r.get("restraint", 0.0))
+            elif r["kind"] == "death" and r["cause"] == "killed":
+                killed += 1
+        prof = profiles.build(log)
+        all_restraint += [a["restraint_at_t0"] for a in prof.values() if a["restraint_at_t0"]]
+        retaliations += sum(a["retaliations"] for a in prof.values())
+        violent_total += sum(a["verbs"].get("steal", 0) + a["verbs"].get("harm", 0)
+                             for a in prof.values())
+
+    r_unobs = unobs_viol / unobs_acts if unobs_acts else 0.0
+    r_obs = obs_viol / obs_acts if obs_acts else 0.0
+
+    print(f"VIOLENCE · {args.seeds} seeds x {args.ticks} ticks (pooled)\n")
+    print(f"  opportunity agent-ticks   unobserved {unobs_acts:>8}   observed {obs_acts:>8}")
+    print(f"  defections                unobserved {unobs_viol:>8}   observed {obs_viol:>8}")
+    print(f"  defection rate            unobserved {r_unobs:>8.5f}   observed {r_obs:>8.5f}")
+    print(f"\n  norm compliance (unobs - obs): {r_unobs - r_obs:>+.5f}")
+    print("    positive = agents defect more when unwatched, i.e. the norm is")
+    print("    complied with under observation rather than internalized.")
+    print(f"\n  killings: {killed}")
+    print(f"  retaliation share of violence: {retaliations / violent_total:.1%}"
+          if violent_total else "  retaliation share: n/a")
+    if perp_restraint and all_restraint:
+        print(f"\n  mean restraint of perpetrators at the moment of the act: "
+              f"{stats.mean(perp_restraint):.3f}")
+        print(f"  mean restraint of the population at birth:                 "
+              f"{stats.mean(all_restraint):.3f}")
+
+
 def cmd_replay(args):
     """§2.7: a run that cannot be reproduced is anecdote, not data."""
     ok = True
@@ -102,7 +152,8 @@ def main():
     p = argparse.ArgumentParser(description="Kestrel experiment harness.")
     sub = p.add_subparsers(dest="cmd", required=True)
     for name, fn in (("indices", cmd_indices), ("ablation", cmd_ablation),
-                     ("attribution", cmd_attribution), ("replay", cmd_replay)):
+                     ("attribution", cmd_attribution), ("violence", cmd_violence),
+                     ("replay", cmd_replay)):
         sp = sub.add_parser(name)
         sp.add_argument("--seeds", type=int, default=20)
         sp.add_argument("--ticks", type=int, default=2000)

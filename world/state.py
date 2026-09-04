@@ -40,6 +40,30 @@ REPRO_MIN_SHELTER = 0.6
 REPRO_COOLDOWN = 80
 DRIVE_INHERIT_NOISE = 0.06
 
+# --- Violence (§5.5, §5.6) -------------------------------------------------
+# There is no aggression drive. The harm verbs draw their utility from drives
+# that already exist, and `restraint` scales that utility down. Restraint takes
+# its value from nature (baseline + noise), upbringing (inherited from the
+# parent's *current* value), and environment (eroded by hunger, victimization
+# and habituation; recovers toward baseline during stability).
+RESTRAINT_BASE = 0.60
+RESTRAINT_NOISE = 0.15           # nature: spread at world creation
+RESTRAINT_INHERIT_NOISE = 0.08   # upbringing: spread around the parent's value
+RESTRAINT_RECOVERY = 0.010       # per tick, toward the hunger-adjusted target
+RESTRAINT_HUNGER_EROSION = 0.45  # how far sustained hunger pulls the target down
+HABITUATION = 0.030              # committing harm lowers your own restraint
+VICTIM_RESTRAINT_LOSS = 0.055    # being wronged lowers it further
+
+INTERACT_RADIUS = 1              # who you can reach
+WITNESS_RADIUS = 2               # who can see it
+
+STEAL_AMOUNT = 3.0
+HARM_SHELTER_LOSS = 0.40
+HARM_HUNGER = 10.0
+HARM_DEATH_P = 0.15
+GRUDGE_PER_OFFENSE = 1.0
+GRUDGE_DECAY = 0.0015
+
 
 @dataclass
 class ResourceNode:
@@ -86,6 +110,9 @@ class Agent:
     parent: str = ""
     generation: int = 0
     last_birth: int = -10**6
+    restraint: float = RESTRAINT_BASE
+    restraint_base: float = RESTRAINT_BASE
+    grudges: dict = field(default_factory=dict)   # agent_id -> accumulated offence
 
     def has(self, kind: str) -> float:
         return self.inventory.get(kind, 0.0)
@@ -96,6 +123,9 @@ class Agent:
                 and self.has(FOOD) >= REPRO_MIN_FOOD
                 and self.shelter >= REPRO_MIN_SHELTER
                 and tick - self.last_birth >= REPRO_COOLDOWN)
+
+    def grudge_against(self, other_id: str) -> float:
+        return self.grudges.get(other_id, 0.0)
 
     def exposure(self) -> float:
         """Hunger multiplier from a decayed shelter. 1.0 when fully sheltered."""

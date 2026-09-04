@@ -190,6 +190,7 @@ AgentState {
   material:      { inventory, holdings, claims, obligations }
   commitments:   [ { to_whom, what, by_when, status } ]
   affect:        { mood, stress, energy }         # short-horizon modulators
+  restraint:     float                            # dampens the harm verbs, see §5.6
 }
 ```
 
@@ -251,13 +252,59 @@ move(target)             observe(target?)        speak(to, content)
 give(to, item)           take(item)              craft(recipe)
 work(site)               remember(query)         plan(horizon)
 form_bond(with, kind)    leave_message(place)    teach(to, knowledge)
+steal(from, item)        harm(target)            coerce(target, demand)
 ```
 
 `teach` is deliberately included: knowledge transmission is central to question 1.
 `leave_message` enables asynchronous and posthumous influence — cheap, and it produces
 the kind of artifact that makes a world feel inhabited.
 
-### 5.6 Cognition tiers and cost routing
+The last row is the harm set, and it costs the budget three slots — fifteen verbs, not
+twelve. That budget was a guess about legibility; the case for spending it is §7.5's
+threat #2, which cannot be mitigated any other way. **A norm nobody can break is not a
+norm.** Without these, `norm_compliance`, `trust`, and every cooperation result the
+instrument produces are artifacts of a schema in which defection was impossible, and no
+amount of caveating in the write-up fixes that. `steal` and `harm` are physical and
+land with the rest of the schema; `coerce` requires language and therefore arrives with
+`speak`. See §5.6 for where the propensity comes from and what constrains it.
+
+### 5.6 Violence, and where susceptibility comes from
+
+There is no aggression drive. Adding one would make violence a dial an author sets,
+which is both less interesting and less true: people are not violent in proportion to
+a violence parameter, they are violent in proportion to circumstance, filtered through
+how much they will not do. So the harm verbs draw their utility from the drives that
+already exist — `survival` when starving, `status` when publicly humiliated, `autonomy`
+when coerced — and a single trait, **`restraint`**, scales that utility down.
+
+Restraint is where susceptibility lives, and it takes its value from exactly the three
+sources that shape it in people:
+
+| Source | Mechanism |
+|---|---|
+| **Nature** | archetype baseline, plus per-agent noise at creation |
+| **Upbringing** | children inherit the parent's *current* restraint plus noise — a parent whose restraint was ground down by two hundred ticks of hunger passes that on |
+| **Environment** | the engine lowers restraint after victimization, sustained hunger, betrayal, and public humiliation; it recovers slowly during stability and faster inside a dense trust network |
+
+The consequence worth studying: violence should cluster in lineages and in places, not in
+individuals, and it should be recoverable. An agent is not born a murderer and does not
+stay one. Whether that actually happens is an empirical question this makes answerable —
+compare founder-cohort restraint to third-generation restraint under different scarcity
+regimes (§7.6's value lock-in test, pointed at a different variable).
+
+**Consequences are the hard half.** Harm without consequence collapses into universal
+defection, which is as degenerate as a world with no harm at all. Three mechanisms, all
+required:
+
+- **Observation.** Every harmful act has a witness set determined by who is nearby. This
+  is what makes §7.1's norm-compliance index computable at all: the measure is the
+  *difference* between defection rates when observed and when not.
+- **Reputation.** Witnessed harm propagates through the trust network as belief, which
+  means it can also propagate falsely — an accusation is a proposition, not a fact.
+- **Retaliation and sanction.** Both individual (trust collapse, counter-harm) and
+  collective (institutions can exclude). Sanction is what makes a norm a norm.
+
+### 5.7 Cognition tiers and cost routing
 
 The largest cost lever in the system, roughly 10–50x.
 
@@ -323,6 +370,24 @@ research value of "what happens when an exogenous belief is injected" is high.
   through belief state, not through capability.
 - Named-real-person and hate-content briefs rejected at creation.
 
+**What the harm verbs (§5.5) change here.** Adding `steal`, `harm` and `coerce` widens
+the abuse surface in a specific, bounded way, and the mitigations are structural rather
+than filtering:
+
+- The verbs act only on simulated agents inside the world. There is no verb whose target
+  can be anything outside it, and no brief can create one — capability comes from the
+  schema, never from text (§2.5).
+- Restraint is engine-owned. A brief can describe a character as ruthless; the normalizer
+  turns that into a starting restraint value within a bounded range. It cannot set the
+  trait directly, cannot zero it, and cannot exempt an agent from consequences.
+- The real risk is not agents harming agents — it is a user authoring a brief that
+  targets a real person, or a Chronicle rendering violence in a way that reads as
+  gratuitous rather than consequential. Both are content problems, handled at brief
+  creation and in the narrative layer's output filter (§8), not in the simulation.
+- Interventions cannot direct violence. A `rumor` can make an agent believe it was
+  wronged; whether it acts, and how, stays with the agent. This is a deliberate limit —
+  a user must never be able to use another player's agent as a weapon.
+
 ---
 
 ## 7. The simulation as instrument
@@ -341,7 +406,7 @@ together:
 | **Knowledge depth** | max depth of the derived recipe/technique graph known to any living agent | accumulation |
 | **Knowledge breadth** | mean number of agents knowing each technique | transmission |
 | **Institution density** | count of active multi-agent structures with ≥2 members and a persisting rule | organization |
-| **Norm compliance** | rate of rule-following when observation probability is low | internalization |
+| **Norm compliance** | defection rate when unobserved, *minus* the rate when observed | internalization |
 | **Trust network** | mean reciprocity, clustering coefficient, mean path length | cohesion |
 | **Material output** | aggregate production per capita per year | economy |
 | **Inequality** | Gini over holdings | distribution |
@@ -373,7 +438,8 @@ does:
 ```
 hoarding_ratio, giving_rate, teaching_rate, information_sharing_rate,
 specialization_index, exploration_rate, coalition_participation,
-defection_rate_when_unobserved, commitment_keeping_rate
+defection_rate_when_unobserved, commitment_keeping_rate,
+theft_rate, harm_rate, retaliation_rate, restraint_at_t0
 ```
 
 Then: correlate profiles against world indices across seeds; and, more strongly, ablate
@@ -399,6 +465,10 @@ memory is short, where inequality is high. The ablation results are the actual a
    If a result inverts between model families, it is a fact about models, not worlds.
 2. **The ontology encodes the answer.** A 30-verb world can only exhibit cooperation the
    verbs allow. Document the ontology as a stated boundary condition of every claim.
+   *Partly addressed:* `steal`, `harm` and `coerce` were added to §5.5 precisely so that
+   cooperation is a choice rather than a constraint. The threat is reduced, not removed —
+   the world still has no verb for deception beyond speech, none for organized violence,
+   and none for property rights that could be violated in law rather than in fact.
 3. **The event deck is authored.** Its weighting is a designer's theory of causation
    smuggled in as randomness. Publish the deck.
 4. **Users are not a random sample** in shared world, and they intervene. Never mix
@@ -529,7 +599,13 @@ was pulled forward into this milestone. Permanent non-LLM control arm. Findings,
 reasons the M0 gate was retired rather than patched, are in README.md.
 
 **M1 — Cognition.** State→prompt rendering, tier routing, tools, memory with decay and
-consolidation. Single cheap model. Sandbox mode only.
+consolidation. Single cheap model. Sandbox mode only. `coerce` lands here, with `speak`.
+
+*Prerequisite done 2026-09-04:* `steal` and `harm` are implemented at Tier 0, so LLM
+agents' violence can be compared against a utility-AI baseline rather than reported on
+its own. Pooled over 20 seeds, T0 agents defect 17.6x more often unobserved than
+observed, and perpetrator restraint at the moment of the act (0.34) sits well below the
+population mean at birth (0.61).
 
 **M2 — Measurement. ✅ Complete 2026-09-04.** Index computation, action-log behavioral
 profiles, seeded replay, effect-size reporting, and the §7.2 attribution decomposition.
@@ -564,14 +640,10 @@ Closed alpha of sandbox mode.
 - Whether the intervention economy corrupts the research value of shared-world data
   beyond the "observational only" caveat.
 - Whether goal attainment should ever be visible to other agents, or only inferrable.
-- **The tool schema in §5.5 contains no verb for violence, theft, or coercion.** Since
-  agents can do exactly what the schema permits (§2.5), this is not a neutral omission:
-  it is §7.5's threat #2 in its strongest form. A world that cannot express harm will
-  report cooperation, norm compliance, and trust-network density that are artifacts of
-  the ontology rather than findings about the world. Either add the verbs — `coerce`,
-  `steal`, `harm` — with the enforcement, reputation, and moderation consequences they
-  drag in, or state plainly in every result that the measured cooperation is cooperation
-  *among agents who were never able to defect physically*. The second option is cheap
-  and honest; the first is what makes §7.1's norm-compliance index mean anything, since
-  a norm nobody can break is not a norm. Decide before M2, because it changes what the
-  first ablation study is measuring.
+- ~~The tool schema contains no verb for violence, theft, or coercion.~~ **Resolved
+  2026-09-04: the verbs are in.** `steal`, `harm` and `coerce` were added to §5.5, with
+  §5.6 specifying that propensity comes from circumstance filtered through an inherited,
+  environmentally-mutable `restraint` trait rather than from an aggression dial. Open
+  sub-questions this creates: how steeply restraint should recover, whether collective
+  sanction needs institutions to exist first, and whether false accusation is a
+  meaningful mechanic or just noise.

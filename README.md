@@ -3,7 +3,8 @@
 Headless simulation of a world of agents with private, heterogeneous goals.
 Design: [DESIGN.md](DESIGN.md). Spectator mockup: `mockup/spectator.html`.
 
-**Status: M0 and M2 complete**, plus the §4.5 event deck. No LLM anywhere.
+**Status: M0 and M2 complete**, plus the §4.5 event deck and the T0 violence baseline.
+No LLM anywhere.
 Every agent runs on utility AI over its drive vector — this is the permanent non-LLM
 control arm from §7.5, not a placeholder to be replaced. M1 (cognition) has not
 started.
@@ -186,8 +187,83 @@ asked to stand in for them.
 
 `gate.py` is kept as-is, unmodified, as the record of what M0 actually tested.
 
-**Known limit.** The tool schema still has no verb for violence or theft — see the open
-question in §12, which governs what the norm-compliance index can mean.
+## Violence at Tier 0
+
+`steal` and `harm` are implemented in the utility AI, with no model calls, so that when
+LLM agents arrive their violence is measurable *against* something rather than merely
+narratable. `coerce` needs language and waits for M1.
+
+**There is no aggression drive.** The harm verbs draw utility from drives that already
+exist — `survival` under hunger, plus accumulated grudge — and one trait, `restraint`,
+scales it down. Restraint comes from the three places it comes from in people:
+
+| Source | Mechanism |
+|---|---|
+| Nature | archetype baseline plus per-agent noise at world creation |
+| Upbringing | children inherit the parent's *current* restraint plus noise, not the baseline |
+| Environment | eroded by sustained hunger, victimization, and habituation; recovers toward baseline during stability |
+
+Inhibition scales with restraint **and** with the number of bystanders, multiplicatively.
+An agent with high restraint is strongly deterred by being seen; an agent whose restraint
+has been ground away barely registers it. That asymmetry is what produces a real
+observed/unobserved differential instead of one asserted by the metric.
+
+### Norm compliance, 20 seeds x 8000 ticks pooled
+
+```
+  opportunity agent-ticks   unobserved   174404   observed   437109
+  defections                unobserved     3132   observed      448
+  defection rate            unobserved  0.01796   observed  0.00102
+
+  norm compliance (unobs - obs): +0.01693
+```
+
+Agents defect **17.6x more often when nobody is watching**. Also: 189 killings,
+retaliation accounts for ~50% of all violence, and perpetrators average 0.34 restraint at
+the moment of the act against a population mean of 0.61 at birth. Violence is committed
+by the disinhibited, and disinhibition is mostly made rather than born.
+
+**Two construction bugs found on the way, both of which produced confident wrong
+numbers.** Recorded because each is the kind that does not announce itself:
+
+1. **The denominator was all actions.** Violence needs a reachable target, and proximity
+   is also what produces witnesses, so conditioning on every action made the two arms
+   non-comparable — norm compliance came out *negative*, implying agents preferred to
+   defect in public. The denominator has to be agent-ticks where violence was possible.
+2. **The victim was counted as a witness.** Any target within reach (radius 1) is
+   necessarily inside witness range (radius 2), so having someone to rob guaranteed a
+   "witness" and the unobserved arm was empty by construction — 0 unobserved
+   opportunities across 20 seeds. The prospective victim is discounted now.
+
+A third, smaller one: witness and opportunity counts were snapshotted at tick start while
+the decision happened mid-tick, after other agents had moved. Numerator and denominator
+were measuring different worlds. Both are computed live per agent now.
+
+### Ablation: violence on vs off, 20 paired seeds
+
+```
+index                     on       off     delta   cohen d
+population             5.900     7.950    -2.050     -0.42
+inequality             0.166     0.231    -0.065     -0.50
+drive_diversity        0.748     0.896    -0.148     -0.40
+life_expectancy      218.950   229.040   -10.090     -0.50
+violence_rate          4.943     0.000     4.943      1.87
+mean_restraint         0.381     0.433    -0.052     -0.26
+```
+
+Adding defection costs population, lifespan and drive diversity — and **lowers
+inequality** (d = -0.50). Theft is redistributive: it moves food from agents who have
+accumulated it to agents who have none. Whether that is a finding about worlds or an
+artifact of a world with only two resources is exactly the kind of question M1 exists to
+put pressure on.
+
+*Not* reported as a finding: `material_output` rises with violence on (d = 0.39). It is
+measured per capita, and violence lowers population, so the ratio moves without the
+numerator doing anything interesting. Flagged rather than quietly included.
+
+**Known limit.** The world still has no verb for organized violence, for deception beyond
+speech, or for property rights violable in law rather than in fact — see §7.5 threat #2,
+now partly rather than fully addressed.
 
 
 ## M2 — measurement

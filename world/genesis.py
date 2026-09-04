@@ -7,7 +7,15 @@ the tick loop has something to chew on.
 
 import random
 
-from .state import FOOD, WOOD, Agent, ResourceNode, World
+from .state import (
+    FOOD,
+    RESTRAINT_BASE,
+    RESTRAINT_NOISE,
+    WOOD,
+    Agent,
+    ResourceNode,
+    World,
+)
 
 BASELINE_DRIVES = {"survival": 0.45, "mastery": 0.35, "curiosity": 0.35}
 
@@ -56,5 +64,9 @@ def make_world(seed: int, config: dict) -> World:
             # every cohort onto the same breeding tick and drives a boom-bust
             # that has nothing to do with the economy being studied.
             age=rng.randrange(0, config["founder_max_age"]),
+            # Nature (§5.6): founders differ in restraint from the first tick.
+            restraint=(r := max(0.0, min(1.0, RESTRAINT_BASE
+                                         + rng.uniform(-RESTRAINT_NOISE, RESTRAINT_NOISE)))),
+            restraint_base=r,
         ))
     return w
