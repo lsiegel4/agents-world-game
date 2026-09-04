@@ -52,14 +52,34 @@ def inequality(world: World) -> float:
 
 
 def drive_diversity(world: World) -> float:
-    """Entropy of the drive-vector distribution across the population — §7.1's
-    pluralism index. Measured per drive as spread across agents, then averaged:
-    a population that has all converged on the same vector scores low."""
+    """§7.1's pluralism index: how far apart the population's drive vectors are.
+
+    Mean pairwise Euclidean distance between drive vectors, normalised by the
+    maximum possible for the number of drives.
+
+    This replaces a normalised-entropy version that could not discriminate.
+    Entropy over N similar positive numbers is ~1 whatever their spread, so the
+    index read 0.997 with a standard deviation of 0.001 across every condition
+    ever run — including after six genuinely different archetypes were
+    introduced. It was measuring the number of agents, not their variety.
+    """
     live = world.living_agents()
     if len(live) < 2:
         return 0.0
-    names = list(live[0].drives.keys())
-    return stats.mean([stats.entropy([a.drives[n] for a in live]) for n in names])
+    names = sorted(live[0].drives)
+    vectors = [[a.drives.get(n, 0.0) for n in names] for a in live]
+
+    # Sample rather than compare all pairs: this runs every tick at scale.
+    step = max(1, len(vectors) // 40)
+    sample = vectors[::step]
+    total = pairs = 0.0
+    for i, a in enumerate(sample):
+        for b in sample[i + 1:]:
+            total += sum((x - y) ** 2 for x, y in zip(a, b)) ** 0.5
+            pairs += 1
+    if not pairs:
+        return 0.0
+    return min(1.0, (total / pairs) / (len(names) ** 0.5))
 
 
 def life_expectancy(log) -> float:

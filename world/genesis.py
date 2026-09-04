@@ -7,6 +7,7 @@ the tick loop has something to chew on.
 
 import random
 
+from . import archetypes
 from .state import (
     FOOD,
     RESTRAINT_BASE,
@@ -54,6 +55,7 @@ def make_world(seed: int, config: dict) -> World:
         ))
 
     for i in range(config["agents"]):
+        kind = archetypes.assign(i)
         # Uneven endowment from the first tick — DESIGN.md §2.2. Nothing here
         # tries to make the starts fair.
         w.agents.append(Agent(
@@ -61,9 +63,10 @@ def make_world(seed: int, config: dict) -> World:
             name=NAMES[i % len(NAMES)],
             x=rng.randrange(w.width),
             y=rng.randrange(w.height),
-            drives={k: round(v + rng.uniform(-0.08, 0.08), 4)
-                    for k, v in BASELINE_DRIVES.items()},
-            inventory={FOOD: float(rng.randrange(0, config["start_food"] + 1)),
+            archetype=kind,
+            drives=archetypes.drives_for(kind, rng),
+            inventory={FOOD: round(rng.randrange(0, config["start_food"] + 1)
+                                   * archetypes.spec(kind)["endowment"], 1),
                        WOOD: 0.0},
             hunger=float(rng.randrange(0, 8)),
             # Founders are not all newborns. Uniform starting age synchronizes
@@ -71,8 +74,7 @@ def make_world(seed: int, config: dict) -> World:
             # that has nothing to do with the economy being studied.
             age=rng.randrange(0, config["founder_max_age"]),
             # Nature (§5.6): founders differ in restraint from the first tick.
-            restraint=(r := max(0.0, min(1.0, RESTRAINT_BASE
-                                         + rng.uniform(-RESTRAINT_NOISE, RESTRAINT_NOISE)))),
+            restraint=(r := archetypes.restraint_for(kind, rng)),
             restraint_base=r,
         ))
     return w

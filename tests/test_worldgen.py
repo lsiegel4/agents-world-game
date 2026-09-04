@@ -119,11 +119,25 @@ class TestAssembly(unittest.TestCase):
                     "institutions", "material"):
             self.assertTrue(lore[key], key)
 
-    def test_inequality_parameter_moves_endowments(self):
+    def test_inequality_parameter_widens_site_shares(self):
+        """The parameter governs how unevenly the *sites* are endowed (§4.4).
+
+        Asserting on final agent endowments instead is a weak test: archetype
+        endowment (§6.1) multiplies on top, and with a handful of agents the two
+        can cancel — a rich archetype landing on a poor site and vice versa.
+        Test the mechanism the parameter actually controls.
+        """
+        def spread(level):
+            shares = _world(inequality=level, agents=24, sites=8) \
+                .lore["material"]["site_shares"]
+            return max(shares) - min(shares)
+        self.assertAlmostEqual(spread(0.0), 0.0, places=6)
+        self.assertGreater(spread(0.9), 0.05)
+        self.assertGreater(spread(0.9), spread(0.4))
+
+    def test_archetypes_alone_make_starts_unequal(self):
         level = [a.inventory["food"] for a in _world(inequality=0.0).agents]
-        steep = [a.inventory["food"] for a in _world(inequality=0.9).agents]
-        self.assertEqual(len(set(level)), 1)          # flat when asked for flat
-        self.assertGreater(len(set(steep)), 1)        # uneven when asked for uneven
+        self.assertGreater(len(set(level)), 1)
 
     def test_generation_is_deterministic(self):
         a, b = _world(), _world()

@@ -12,6 +12,7 @@ discipline that separate PRNG streams enforce elsewhere.
 
 import random
 
+from . import archetypes
 from . import history as history_pass
 from . import terrain as terrain_pass
 from .state import FOOD, WOOD, Agent, ResourceNode, World
@@ -128,19 +129,20 @@ def make_world(seed: int, config: dict) -> World:
     from .state import RESTRAINT_BASE, RESTRAINT_NOISE
 
     for index in range(config["agents"]):
+        kind = archetypes.assign(index)
         site_index = index % max(1, len(sites))
         _, sx, sy = sites[site_index] if sites else (0, world.width // 2, world.height // 2)
         share = material["site_shares"][site_index] if material["site_shares"] else 0.25
-        restraint = max(0.0, min(1.0, RESTRAINT_BASE
-                                 + rng.uniform(-RESTRAINT_NOISE, RESTRAINT_NOISE)))
+        restraint = archetypes.restraint_for(kind, rng)
         world.agents.append(Agent(
             id=f"a{index:02d}",
             name=NAMES[index % len(NAMES)],
             x=max(0, min(world.width - 1, sx + rng.randrange(-2, 3))),
             y=max(0, min(world.height - 1, sy + rng.randrange(-2, 3))),
-            drives={k: round(v + rng.uniform(-0.08, 0.08), 4)
-                    for k, v in BASELINE_DRIVES.items()},
-            inventory={FOOD: round(config["start_food"] * share * len(sites), 1),
+            archetype=kind,
+            drives=archetypes.drives_for(kind, rng),
+            inventory={FOOD: round(config["start_food"] * share * len(sites)
+                                   * archetypes.spec(kind)["endowment"], 1),
                        WOOD: 0.0},
             hunger=float(rng.randrange(0, 8)),
             age=rng.randrange(0, config["founder_max_age"]),

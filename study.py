@@ -35,11 +35,35 @@ SCALE = {
 }
 
 
+SMALL = {"agents": 5, "sites": 4, "width": 24, "height": 16,
+         "food_nodes": 6, "wood_nodes": 3}
+
+
 def scaled(extra=None):
     cfg = dict(SCALE)
     if extra:
         cfg.update(extra)
     return cfg
+
+
+def condition(args, extra=None):
+    """The population condition for this run.
+
+    Scale is the default and small has to be asked for. Three findings were
+    retracted because 5 founders was the path of least resistance; leaving the
+    artifact-producing configuration as the default guarantees a repeat.
+    """
+    cfg = dict(SMALL if getattr(args, "small", False) else SCALE)
+    if extra:
+        cfg.update(extra)
+    return cfg
+
+
+def header(args, title: str) -> str:
+    """Every study states its population. DESIGN.md §12."""
+    cfg = condition(args)
+    return (f"{title} · {cfg['agents']} founders · {args.seeds} seeds · "
+            f"{args.ticks} ticks")
 
 
 INDEX_KEYS = ["population", "material_output", "material_output_total",
@@ -60,8 +84,8 @@ def collect(seeds: int, ticks: int, config: dict = None) -> dict:
 
 
 def cmd_indices(args):
-    data = collect(args.seeds, args.ticks, scaled() if args.scale else None)
-    print(f"§7.1 index vector · {args.seeds} seeds · {args.ticks} ticks\n")
+    data = collect(args.seeds, args.ticks, condition(args))
+    print(header(args, "§7.1 index vector") + "\n")
     print(f"{'index':<18} {'mean':>9} {'sd':>8} {'min':>8} {'max':>8}")
     for k in INDEX_KEYS:
         v = data[k]
@@ -74,11 +98,10 @@ def cmd_indices(args):
 
 def cmd_ablation(args):
     arm = args.arm
-    base = scaled if args.scale else (lambda extra=None: dict(extra or {}))
-    on = collect(args.seeds, args.ticks, base({arm: True}))
-    off = collect(args.seeds, args.ticks, base({arm: False}))
+    on = collect(args.seeds, args.ticks, condition(args, {arm: True}))
+    off = collect(args.seeds, args.ticks, condition(args, {arm: False}))
 
-    print(f"ABLATION · {arm} on vs off · {args.seeds} paired seeds · {args.ticks} ticks\n")
+    print(header(args, f"ABLATION · {arm} on vs off") + "\n")
     print(f"{'index':<18} {'on':>9} {'off':>9} {'delta':>9} {'cohen d':>9}")
     for k in INDEX_KEYS:
         a, b = on[k], off[k]
@@ -91,14 +114,13 @@ def cmd_attribution(args):
     """Pool agents across seeds, then decompose lifespan (§7.2)."""
     pooled = {}
     for seed in range(args.seeds):
-        _, log = run(seed, args.ticks, scaled() if args.scale else None)
+        _, log = run(seed, args.ticks, condition(args))
         for agent_id, prof in profiles.build(log).items():
             pooled[f"s{seed}:{agent_id}"] = prof
 
     res = profiles.attribution(pooled)
-    print(f"ATTRIBUTION · lifespan ~ endowment + luck + policy")
-    print(f"{args.seeds} seeds · {args.ticks} ticks · {len(pooled)} agents lived, "
-          f"n={res['n']} analysed · R2={res['r2']}\n")
+    print(header(args, "ATTRIBUTION · lifespan ~ endowment + luck + policy"))
+    print(f"{len(pooled)} agents lived, n={res['n']} analysed · R2={res['r2']}\n")
     print("  standardized betas:")
     for name, b in res["betas"].items():
         bar = "#" * int(abs(b) * 40)
@@ -122,12 +144,10 @@ def cmd_worldgen(args):
     whether inherited history changes behaviour, which is §11's actual claim and
     needs the LLM arm.
     """
-    base = scaled if args.scale else (lambda extra=None: dict(extra or {}))
-    flat = collect(args.seeds, args.ticks, base({"worldgen": "flat"}))
-    gen = collect(args.seeds, args.ticks, base({"worldgen": "generated"}))
+    flat = collect(args.seeds, args.ticks, condition(args, {"worldgen": "flat"}))
+    gen = collect(args.seeds, args.ticks, condition(args, {"worldgen": "generated"}))
 
-    print(f"WORLDGEN · generated vs flat · {args.seeds} paired seeds · "
-          f"{args.ticks} ticks · Tier 0 only\n")
+    print(header(args, "WORLDGEN · generated vs flat") + " · Tier 0 only\n")
     print(f"{'index':<22} {'flat':>10} {'generated':>10} {'delta':>10} {'cohen d':>9}")
     for k in INDEX_KEYS:
         a, b = gen[k], flat[k]
@@ -146,7 +166,7 @@ def cmd_violence(args):
     retaliations = violent_total = 0
 
     for seed in range(args.seeds):
-        _, log = run(seed, args.ticks, scaled() if args.scale else None)
+        _, log = run(seed, args.ticks, condition(args))
         for r in log.records:
             if r["kind"] == "action" and r.get("opp", 0) >= 1:
                 violent = r["verb"] in indices.VIOLENT_VERBS
@@ -169,7 +189,7 @@ def cmd_violence(args):
     r_unobs = unobs_viol / unobs_acts if unobs_acts else 0.0
     r_obs = obs_viol / obs_acts if obs_acts else 0.0
 
-    print(f"VIOLENCE · {args.seeds} seeds x {args.ticks} ticks (pooled)\n")
+    print(header(args, "VIOLENCE") + " (pooled)\n")
     print(f"  opportunity agent-ticks   unobserved {unobs_acts:>8}   observed {obs_acts:>8}")
     print(f"  defections                unobserved {unobs_viol:>8}   observed {obs_viol:>8}")
     print(f"  defection rate            unobserved {r_unobs:>8.5f}   observed {r_obs:>8.5f}")
@@ -193,6 +213,7 @@ def cmd_cognition(args):
     attributable to cognition and not to a wider action space. This is the
     comparison the permanent control arm in brain.py exists for (§7.5).
     """
+    print(header(args, "COGNITION setup"))
     client = ModelClient(cache_path=args.cache, mode=args.mode, max_usd=args.max_usd,
                          progress_every=args.progress_every)
     if args.mode != "replay":
@@ -204,12 +225,12 @@ def cmd_cognition(args):
     minds = []
 
     for seed in range(args.seeds):
-        world, log = run(seed, args.ticks)
+        world, log = run(seed, args.ticks, condition(args))
         for k in INDEX_KEYS:
             t0[k].append(indices.vector(world, log)[k])
 
         mind = cognition.Cognition(client=client, on_cache_miss=args.on_miss)
-        world, log = run(seed, args.ticks, mind=mind)
+        world, log = run(seed, args.ticks, condition(args), mind=mind)
         for k in INDEX_KEYS:
             t1[k].append(indices.vector(world, log)[k])
         minds.append(mind)
@@ -252,8 +273,8 @@ def cmd_replay(args):
     """§2.7: a run that cannot be reproduced is anecdote, not data."""
     ok = True
     for seed in range(args.seeds):
-        _, a = run(seed, args.ticks)
-        _, b = run(seed, args.ticks)
+        _, a = run(seed, args.ticks, condition(args))
+        _, b = run(seed, args.ticks, condition(args))
         match = a.digest() == b.digest()
         ok &= match
         print(f"  seed {seed}: {a.digest()[:16]} {'match' if match else 'MISMATCH'}")
@@ -270,8 +291,9 @@ def main():
         sp = sub.add_parser(name)
         sp.add_argument("--seeds", type=int, default=20)
         sp.add_argument("--ticks", type=int, default=2000)
-        sp.add_argument("--scale", action="store_true",
-                        help="run at the 120-founder scale condition")
+        sp.add_argument("--small", action="store_true",
+                        help="run the 5-founder condition instead of the "
+                             "120-founder default (artifact-prone; see README)")
         if name == "ablation":
             sp.add_argument("--arm", default="deck")
         if name == "cognition":

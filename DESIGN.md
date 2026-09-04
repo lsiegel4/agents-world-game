@@ -677,6 +677,14 @@ Closed alpha of sandbox mode.
   an artifact.
 - Whether the intervention economy corrupts the research value of shared-world data
   beyond the "observational only" caveat.
+- **`outlive` is a goal that completes by doing nothing, and it swallows the
+  population.** Time alone is progress, so it never goes stale and always eventually
+  succeeds; at t=3000 it is held by 21 of 22 survivors. Goal kinds must require action
+  or they become absorbing states, and a population converged on one goal is §2.1's
+  global objective arriving by the back door. Fix with the goals-against-lore work:
+  goals should point at the world the generator now produces — recover a technique lost
+  in a named era, rebuild a named ruin, hold a seat at an institution — rather than at
+  a bare number.
 - Whether goal attainment should ever be visible to other agents, or only inferrable.
 - **Archetypes are currently a label, not a mechanism.** §6.1 specifies six, and they are
   meant to differ in locked scaffold, initial drive vector, endowment distribution and

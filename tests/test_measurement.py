@@ -221,9 +221,12 @@ class TestMemoryConsolidation(unittest.TestCase):
 
 
 class TestViolence(unittest.TestCase):
-    def test_restraint_is_inherited_not_reset(self):
-        """§5.6 upbringing: a child starts near its parent's *current* restraint,
-        not at the archetype baseline."""
+    def test_restraint_splits_nature_from_upbringing(self):
+        """§5.6: a child's *current* restraint tracks the parent it was raised
+        by; its *baseline* — what it relaxes back toward — comes from the
+        archetype it inherited. Condition from upbringing, nature from the kind.
+        Before archetypes existed both came from the parent."""
+        from world import archetypes
         world, log = run(7, 3000)
         by_id = {a.id: a for a in world.agents}
         checked = 0
@@ -233,9 +236,28 @@ class TestViolence(unittest.TestCase):
             child, parent = by_id.get(r["agent"]), by_id.get(r["parent"])
             if child is None or parent is None:
                 continue
-            self.assertEqual(child.restraint_base, parent.restraint_base)
+            self.assertAlmostEqual(
+                child.restraint_base,
+                archetypes.spec(child.archetype)["restraint"], places=6)
             checked += 1
         self.assertGreater(checked, 0)
+
+    def test_children_usually_inherit_the_parents_archetype(self):
+        """Perfect inheritance seals lineages and makes §7.6's lock-in test
+        trivial; random assignment erases lineage. Drift sits between."""
+        world, log = run(7, 3000)
+        by_id = {a.id: a for a in world.agents}
+        same = total = 0
+        for r in log.records:
+            if r["kind"] != "birth":
+                continue
+            child, parent = by_id.get(r["agent"]), by_id.get(r["parent"])
+            if child and parent:
+                total += 1
+                same += child.archetype == parent.archetype
+        self.assertGreater(total, 0)
+        self.assertGreater(same / total, 0.6)   # mostly inherited
+        self.assertLess(same / total, 1.0)      # but not sealed
 
     def test_restraint_stays_in_range(self):
         world, _ = run(7, 3000)

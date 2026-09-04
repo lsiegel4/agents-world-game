@@ -6,7 +6,7 @@ repair is the smallest set that produces a non-degenerate economy — two
 non-fungible resources at different places, both of them needed.
 """
 
-from . import goals, knowledge
+from . import archetypes, goals, knowledge
 from .genesis import NAMES
 from .state import (
     BOND_RADIUS,
@@ -86,10 +86,12 @@ def work(world: World, agent: Agent, node_id: str, log, witness_count: int = 0, 
     node = world.node_by_id(node_id)
     if node is None or (node.x, node.y) != (agent.x, agent.y) or node.amount <= 0:
         return False
-    room = MAX_CARRY - agent.has(node.kind)
+    cap = MAX_CARRY * knowledge.carry_multiplier(agent)
+    room = cap - agent.has(node.kind)
     if room <= 0:
         return False
-    taken = min(node.harvest() * knowledge.yield_multiplier(agent, node.kind), room)
+    taken = min(node.harvest(knowledge.care_factor(agent))
+                * knowledge.yield_multiplier(agent, node.kind), room)
     agent.inventory[node.kind] = agent.has(node.kind) + taken
     log.emit(world.tick, "action", agent=agent.id, verb="work",
              target=node_id, resource=node.kind, taken=round(taken, 3),
@@ -135,6 +137,7 @@ def reproduce(world: World, agent: Agent, rng, log, witness_count: int = 0, opp:
 
     agent.inventory[FOOD] = agent.has(FOOD) - REPRO_FOOD_COST
     agent.last_birth = world.tick
+    inherited = archetypes.inherit(agent.archetype, rng)
 
     child = Agent(
         # Short, deterministic, unique: one birth per parent per tick, and a
@@ -157,8 +160,11 @@ def reproduce(world: World, agent: Agent, rng, log, witness_count: int = 0, opp:
         restraint=max(0.0, min(1.0, agent.restraint
                                + rng.uniform(-RESTRAINT_INHERIT_NOISE,
                                              RESTRAINT_INHERIT_NOISE))),
-        restraint_base=agent.restraint_base,
+        # Baseline follows the inherited archetype; the current value follows
+        # the parent. Nature from the kind, condition from the upbringing.
+        restraint_base=archetypes.spec(inherited)["restraint"],
         # Uses no randomness, so it cannot perturb the decision stream.
+        archetype=inherited,
         goal=goals.inherit(agent.goal, None, world) if agent.goal else {},
         parent=agent.id,
         generation=agent.generation + 1,

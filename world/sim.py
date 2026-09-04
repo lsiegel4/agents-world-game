@@ -6,7 +6,7 @@ randomness; agents are always processed in list order.
 
 import random
 
-from . import actions, deck, goals, indices, knowledge
+from . import actions, archetypes, deck, goals, indices, knowledge
 from .memory import Memory
 from .genesis import BASELINE_DRIVES, make_world
 from .log import EventLog
@@ -64,20 +64,27 @@ def _clamp(v: float) -> float:
 
 
 def update_drives(agent, verb: str) -> None:
+    """Drives relax toward the agent's own ARCHETYPE baseline, not a global one.
+
+    Relaxing everyone toward one baseline erases archetypes within a few hundred
+    ticks — the differences would exist at creation and be gone by the time
+    anything measured them, which is indistinguishable from not having them.
+    """
+    base = archetypes.spec(agent.archetype)["drives"]
     hunger_norm = min(1.0, agent.hunger / STARVATION_THRESHOLD)
-    target = BASELINE_DRIVES["survival"] + 0.60 * hunger_norm
+    target = base["survival"] + 0.60 * hunger_norm
     d = agent.drives
     d["survival"] = _clamp(d["survival"] + DRIVE_GAIN * (target - d["survival"]))
 
     if verb == "work":
         d["mastery"] = _clamp(d["mastery"] + MASTERY_PER_WORK)
     else:
-        d["mastery"] = _clamp(d["mastery"] + RELAX * (BASELINE_DRIVES["mastery"] - d["mastery"]))
+        d["mastery"] = _clamp(d["mastery"] + RELAX * (base["mastery"] - d["mastery"]))
 
     if verb == "move":
         d["curiosity"] = _clamp(d["curiosity"] + CURIOSITY_PER_MOVE)
     else:
-        d["curiosity"] = _clamp(d["curiosity"] + RELAX * (BASELINE_DRIVES["curiosity"] - d["curiosity"]))
+        d["curiosity"] = _clamp(d["curiosity"] + RELAX * (base["curiosity"] - d["curiosity"]))
 
     for k in d:
         d[k] = round(d[k], 6)
@@ -289,7 +296,7 @@ def run(seed: int, ticks: int, config: dict = None, mind=None):
         log.emit(0, "spawn", agent=agent.id, generation=0, restraint=agent.restraint,
                  x=agent.x, y=agent.y, age=agent.age,
                  food=agent.has("food"), drives=dict(agent.drives),
-                 goal=agent.goal.get("kind", ""),
+                 goal=agent.goal.get("kind", ""), archetype=agent.archetype,
                  # Distance to the nearest node of each kind is the spatial half
                  # of endowment, and M0 showed it dominates survival.
                  d_food=min((max(abs(n.x - agent.x), abs(n.y - agent.y))

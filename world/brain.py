@@ -6,7 +6,7 @@ scored from the agent's drive weights and its situation; the highest score wins,
 with a small seeded jitter to break ties without breaking determinism.
 """
 
-from . import knowledge
+from . import archetypes, knowledge
 
 GOAL_VERB = {"teach": "teach", "provide": "give", "lineage": "reproduce",
              "bond": "form_bond", "master": "work", "accumulate": "work"}
@@ -111,7 +111,7 @@ def candidates(world: World, agent: Agent, witness_count: int = 0,
 
     for kind in (FOOD, WOOD):
         node, dist = _nearest_node(world, agent, kind)
-        if node is None or agent.has(kind) >= MAX_CARRY:
+        if node is None or agent.has(kind) >= MAX_CARRY * knowledge.carry_multiplier(agent):
             continue
         gather = w["survival"] * (0.6 * need[kind] + 0.6 * pressure[kind]) + w["mastery"] * 0.25
         if dist == 0:
@@ -184,6 +184,12 @@ def candidates(world: World, agent: Agent, witness_count: int = 0,
 
     out.append((0.05, "idle", {}))
     out = [c for c in out if c[1] not in disabled]
+
+    # Archetype affinity: the verbs this kind of person reaches for first. This
+    # is what makes an archetype visible in behaviour rather than only in its
+    # opening numbers.
+    out = [(u * archetypes.affinity(agent.archetype, verb), verb, params)
+           for u, verb, params in out]
 
     # Goals move behaviour, or they are decoration on a state dict.
     goal_verb = GOAL_VERB.get(agent.goal.get("kind"))

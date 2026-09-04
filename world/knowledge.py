@@ -18,12 +18,20 @@ nothing. That is the point.
 """
 
 # name -> (prerequisites, effect)
+#
+# The graph ran to depth 3 and `knowledge_depth` read 3.000 with zero variance in
+# every condition — pinned at its ceiling, unable to tell any two worlds apart,
+# while being one of the measures behind the project's headline finding. Six
+# levels give it room to actually vary.
 TECHNIQUES = {
-    "gleaning":  ((), "food_yield"),        # depth 1
-    "coppicing": ((), "wood_yield"),        # depth 1
-    "drying":    (("gleaning",), "meal"),   # depth 2
-    "joinery":   (("coppicing",), "repair"),  # depth 2
-    "kiln":      (("drying", "joinery"), "meal_major"),  # depth 3
+    "gleaning":    ((), "food_yield"),                      # 1
+    "coppicing":   ((), "wood_yield"),                      # 1
+    "drying":      (("gleaning",), "meal"),                 # 2
+    "joinery":     (("coppicing",), "repair"),              # 2
+    "kiln":        (("drying", "joinery"), "meal_major"),   # 3
+    "cooperage":   (("kiln",), "carry"),                    # 4
+    "stewardship": (("cooperage", "gleaning"), "care"),     # 5
+    "irrigation":  (("stewardship", "joinery"), "yield_major"),  # 6
 }
 
 DISCOVERY_BASE = 0.0016      # per work action, scaled by curiosity
@@ -32,6 +40,9 @@ WOOD_YIELD_BONUS = 0.30
 MEAL_BONUS = 0.35
 MEAL_MAJOR_BONUS = 0.70
 REPAIR_BONUS = 0.40
+CARRY_BONUS = 0.50          # cooperage: hold more
+CARE_FACTOR = 0.45          # stewardship: harvest degrades a node less
+YIELD_MAJOR_BONUS = 0.65    # irrigation: the deepest technique, worth the climb
 
 
 def depth(name: str) -> int:
@@ -62,11 +73,24 @@ def try_discover(agent, rng) -> str:
 
 
 def yield_multiplier(agent, kind: str) -> float:
+    bonus = 1.0
     if kind == "food" and "gleaning" in agent.techniques:
-        return 1.0 + FOOD_YIELD_BONUS
+        bonus += FOOD_YIELD_BONUS
     if kind == "wood" and "coppicing" in agent.techniques:
-        return 1.0 + WOOD_YIELD_BONUS
-    return 1.0
+        bonus += WOOD_YIELD_BONUS
+    if "irrigation" in agent.techniques:
+        bonus += YIELD_MAJOR_BONUS
+    return bonus
+
+
+def carry_multiplier(agent) -> float:
+    return 1.0 + CARRY_BONUS if "cooperage" in agent.techniques else 1.0
+
+
+def care_factor(agent) -> float:
+    """Stewardship: working a node wears it down less. The only technique that
+    helps the commons rather than the individual holding it."""
+    return CARE_FACTOR if "stewardship" in agent.techniques else 1.0
 
 
 def meal_multiplier(agent) -> float:

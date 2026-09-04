@@ -88,12 +88,17 @@ class ResourceNode:
     def stock_fraction(self) -> float:
         return self.amount / self.capacity if self.capacity else 0.0
 
-    def harvest(self) -> float:
-        """Remove up to HARVEST_RATE. Harvesting a depleted node degrades it."""
+    def harvest(self, care: float = 1.0) -> float:
+        """Remove up to HARVEST_RATE. Harvesting a depleted node degrades it.
+
+        `care` is the stewardship multiplier on that degradation — the one
+        technique whose benefit lands on the commons rather than the harvester.
+        """
         taken = min(self.amount, HARVEST_RATE)
         self.amount -= taken
         if self.stock_fraction() < OVERHARVEST_THRESHOLD:
-            self.degradation = min(DEGRADATION_CAP, self.degradation + DEGRADATION_STEP)
+            self.degradation = min(DEGRADATION_CAP,
+                                   self.degradation + DEGRADATION_STEP * care)
         return taken
 
     def regenerate(self) -> None:
@@ -116,6 +121,7 @@ class Agent:
     age: int = 0
     alive: bool = True
     cause_of_death: str = ""
+    archetype: str = "artisan"                    # §6.1; engine-owned, never user-set
     parent: str = ""
     generation: int = 0
     last_birth: int = -10**6

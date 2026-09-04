@@ -686,3 +686,79 @@ because favours die with the people who owed them.
 technique graph stops at depth 3. It is pinned at its ceiling and cannot discriminate
 between worlds. Either the graph needs more depth or the index needs retiring — as it
 stands the `teach` ablation's depth result was measuring headroom that barely existed.
+
+
+## Two index fixes (2026-09-04)
+
+**`knowledge_depth` was pinned at its ceiling.** The technique graph stopped at depth 3,
+so the index read 3.000 with zero variance in every condition while being one of the
+measures behind the project's headline finding. The graph now runs to depth 6 —
+`cooperage` (carry more), `stewardship` (harvesting wears a node down less; the only
+technique whose benefit lands on the commons), `irrigation` — and the index discriminates
+properly: **5.83 with teaching against 2.17 without.**
+
+**Scale is now the default for every study.** `study.py` runs the 120-founder condition
+unless `--small` is passed, and every study prints its population in the header. Three
+findings were retracted because 5 founders was the path of least resistance; leaving the
+artifact-producing configuration as the default guarantees a repeat.
+
+### What the fixes exposed
+
+Extending the technique graph broke two goal tests, and both were real:
+
+**Goals had collapsed to a single kind.** Every agent alive at t=1500 held `outlive` —
+§2.1's global objective arriving by the back door. Fast goals complete and cycle; `outlive`
+takes 600+ ticks, so survivors drained into it and never left. §5.3 names three revision
+triggers — achieved, impossible, life event — and only two were implemented. Stale goals
+are now abandoned.
+
+**Progress was measured from zero instead of from where the agent started.** `outlive`
+sets its threshold to `age + 600` and scored progress as `age / threshold`, so an agent
+aged 1000 began at 0.62 progress and could never go stale. Progress is now measured from
+the goal's starting baseline for every kind.
+
+`outlive` still dominates, and that part is a design issue rather than a bug — a goal that
+completes by doing nothing will always win in a population that survives. Logged in §12
+with the goals-against-lore work.
+
+## Archetypes (2026-09-04)
+
+§6.1 named six from the start and none of them existed — the archetype was a string on the
+agent that nothing read. Every agent sampled one drive baseline, which had two
+consequences: `drive_diversity` was meaningless, and §7.6's value lock-in test could not
+run, because comparing "the founder cohort" to a later generation requires the founders to
+be a cohort rather than one distribution sampled twice.
+
+`world/archetypes.py` gives each of artisan, broker, scholar, steward, wanderer and zealot
+its own drive vector, restraint baseline, endowment multiplier, verb affinities, and a
+locked scaffold for the LLM arm. Founders are assigned round-robin so a cohort contains
+every kind; children inherit with 15% drift, so lineages are neither sealed nor erased.
+
+**Drives relax toward the agent's own archetype baseline, not a global one.** Relaxing
+everyone toward one baseline erases archetypes within a few hundred ticks — the
+differences would exist at creation and be gone before anything measured them, which is
+indistinguishable from not having them.
+
+### A third broken index
+
+`drive_diversity` used normalised entropy across each drive's values. Normalised entropy
+over N similar positive numbers is ~1 whatever the spread, so the index read **0.997 with
+sd 0.001 across every condition ever run** — including after six genuinely different
+archetypes were introduced. It was measuring the number of agents, not their variety.
+
+Rewritten as mean pairwise distance between drive vectors and validated against an
+all-scholar control: **0.162 for six archetypes against 0.087 for one, a 1.87x separation
+where the old index gave 1.00x.**
+
+That is three indices found broken in one day — `knowledge_depth` at a ceiling,
+`drive_diversity` measuring population size, and `norm_compliance` earlier in the session
+with an empty denominator. Each was reported in results before anyone noticed. The pattern
+is worth naming: **an index that never varies is not a stable finding, it is a broken
+instrument**, and sd across conditions is the cheapest test for it.
+
+### Open
+
+In one seed, scholars were 82 of 108 survivors — archetype selection may be strong enough
+to collapse diversity over time. Not measured across seeds yet, and worth doing before
+archetypes are called finished. The scaffolds are written but not yet wired into
+`prompt.py`, so the LLM arm does not see them.
