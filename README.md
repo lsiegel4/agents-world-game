@@ -3,7 +3,7 @@
 Headless simulation of a world of agents with private, heterogeneous goals.
 Design: [DESIGN.md](DESIGN.md). Spectator mockup: `mockup/spectator.html`.
 
-**Status: M0, M1, M2 and M3 complete.** One live recording run done for $0.41. **All ten
+**Status: M0-M4 complete.** All findings re-measured at 120 founders on 2026-09-04; three were retracted. Read that section before trusting any number elsewhere in this file. One live recording run done for $0.41. **All ten
 §7.1 indices and all ten §7.3 behavioural-profile fields now compute** — both
 `UNAVAILABLE` maps are empty.
 Every agent runs on utility AI over its drive vector — this is the permanent non-LLM
@@ -590,3 +590,99 @@ less food than a flat one. Biome quality should decide *where* resources sit and
 differ from each other, not how much exists in total. Normalised against the mean quality
 of chosen sites, generated worlds now run **14.75 with 0/12 extinct**, and node capacities
 still vary 24-48 — the heterogeneity §4.4 asks for, without the silent shrinkage.
+
+
+## Re-measurement at scale (2026-09-04) — three findings retracted
+
+Every social result in the sections above was measured with **5 founders**. §12 puts the
+design's target population at 100-300. Re-running every study at **120 founders, 20 seeds
+x 2000 ticks** took 30 minutes and cost nothing, and it invalidated three conclusions.
+
+The scale condition is `study.SCALE`; pass `--scale` to any `study.py` command.
+
+### Retracted
+
+**1. "Institutions only exist at scale."** Drawn from a single-seed comparison. Across 20
+seeds, small worlds average 2.0 institutions and 0.371 reciprocity — not zero. Per capita
+the density is **0.146 at scale against 0.148 small**: institutions scale proportionally
+with population and do not emerge from density. The one seed I looked at happened to have
+none.
+
+**2. "Theft is redistributive."** At 5 founders, inequality read 0.166 with violence on
+against 0.231 off (d = -0.50), and I described a mechanism: theft moving food from those
+who had accumulated it to those with none. At 120 founders the effect is **0.001,
+d = 0.02**. The original was an artifact of small-N Gini — with 13 agents a handful of
+thefts shifts a real share of total holdings; with 60 the same per-capita rate is noise.
+The life-expectancy effect (-0.50) vanished the same way (0.02).
+
+At scale, violence is uniformly costly: goal attainment d = -1.66, total output -1.12,
+knowledge breadth -0.74, population -0.53, institutions -0.41. No upside anywhere.
+
+**3. "Policy overtakes luck."** The attribution decomposition reverses at scale
+(n = 6,482 agents, R2 = 0.37):
+
+```
+              at scale    5 founders
+  luck          0.5343         0.442
+  policy        0.4873         0.574
+  endowment     0.1728         0.115
+```
+
+What held: `giving_rate` and `coalition_participation` still carry negative signs and
+`teaching_rate` positive — generosity and bonding cost the individual, teaching pays.
+
+### Strengthened
+
+**Teaching is the strongest lever in the project, by a wide margin**, and at scale it
+turns out to drive far more than knowledge:
+
+```
+  teach ablation                   on        off     cohen d
+  goal_attainment               0.380      0.142        7.76
+  knowledge_depth               3.000      2.000        4.47
+  knowledge_breadth            39.970      4.565        3.45
+  institution_density           8.900      1.350        2.32
+  reciprocity                   0.314      0.179        1.31
+  population                   60.750     42.850        1.17
+  material_output_total     15305.893  13872.974        1.04
+  life_expectancy             205.880    211.150       -0.45
+```
+
+The chain is only visible at scale: teaching creates favours owed, favours make bonds
+acceptable, bonds are institutions. Goal attainment nearly triples — the largest effect
+size measured anywhere in this project.
+
+And teaching slightly *shortens* mean life while improving everything collective. Not a
+contradiction with individual teachers living longer: it supports 18 more people on
+similar ground, so the average falls. A composition effect, not a reversal.
+
+### Scale changes the world's character
+
+```
+  index                      at scale  5 founders
+  population                   60.750     13.500
+  knowledge_breadth            39.970     10.570
+  material_output_total     15305.893   2741.310
+  life_expectancy             205.880    223.320
+  violence_rate                 7.527      5.540
+  inequality                    0.303      0.254
+  goal_attainment               0.380      0.426
+  reciprocity                   0.314      0.371
+```
+
+More people, far more produced, and **worse lives**: shorter, more violent, more unequal,
+fewer goals met. That is §7.1's tradeoff surface in real numbers, and the reason the
+design refuses to collapse the vector into one score.
+
+The deck shows the same shape from the other direction — at scale it *raises* population
+(+0.38) and output (+1.48) while cutting life expectancy by 19.5 ticks (-1.78) and
+reciprocity by a full standard deviation (-1.06). Disruption churns a population: more
+born, more dead, more produced, each life shorter and the favour economy repeatedly reset
+because favours die with the people who owed them.
+
+### One index is broken
+
+`knowledge_depth` reads **3.000 with zero variance** in both conditions, because the
+technique graph stops at depth 3. It is pinned at its ceiling and cannot discriminate
+between worlds. Either the graph needs more depth or the index needs retiring — as it
+stands the `teach` ablation's depth result was measuring headroom that barely existed.

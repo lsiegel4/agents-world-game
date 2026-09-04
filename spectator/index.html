@@ -1,0 +1,366 @@
+<title>Kestrel Basin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+
+<style>
+:root {
+  --bg: #EAEEEC; --surface: #F7FAF8; --surface-2: #E1E7E4;
+  --ink: #131B1A; --muted: #56655F; --faint: #83958E; --line: #C6D1CC;
+  --accent: #0F6E6B; --accent-soft: #D5E5E3; --on-accent: #F7FAF8;
+  --good: #3F7A56; --warn: #A8791A; --crit: #9E3B2E;
+  --d-survival: #C4553B; --d-mastery: #7A5FA6; --d-curiosity: #3E7CA8;
+  --t-water: #9DBCC4; --t-marsh: #A8B48C; --t-meadow: #BFCCA4;
+  --t-wood: #7E9A72; --t-stone: #B9BEB8;
+  --f-display: "Fraunces", Georgia, serif;
+  --f-ui: "IBM Plex Sans", system-ui, sans-serif;
+  --f-data: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0D1413; --surface: #141D1C; --surface-2: #1C2726;
+  --ink: #E3EAE7; --muted: #8CA09A; --faint: #63756F; --line: #2A3735;
+  --accent: #46A79F; --accent-soft: #1B3230; --on-accent: #0D1413;
+  --good: #63A87A; --warn: #C79A3C; --crit: #C4614F;
+  --d-survival: #DB7A61; --d-mastery: #A084CC; --d-curiosity: #5E9FCC;
+  --t-water: #24424A; --t-marsh: #3A4433; --t-meadow: #46533A;
+  --t-wood: #2E4230; --t-stone: #3B403A;
+} }
+:root[data-theme="dark"] {
+  --bg: #0D1413; --surface: #141D1C; --surface-2: #1C2726;
+  --ink: #E3EAE7; --muted: #8CA09A; --faint: #63756F; --line: #2A3735;
+  --accent: #46A79F; --accent-soft: #1B3230; --on-accent: #0D1413;
+  --good: #63A87A; --warn: #C79A3C; --crit: #C4614F;
+  --d-survival: #DB7A61; --d-mastery: #A084CC; --d-curiosity: #5E9FCC;
+  --t-water: #24424A; --t-marsh: #3A4433; --t-meadow: #46533A;
+  --t-wood: #2E4230; --t-stone: #3B403A;
+}
+
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--f-ui);
+       font-size: 14px; line-height: 1.55; -webkit-font-smoothing: antialiased; }
+button { font: inherit; color: inherit; cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.head { display: flex; align-items: baseline; gap: 18px; flex-wrap: wrap;
+        padding: 18px 22px 14px; border-bottom: 1px solid var(--line); }
+.head h1 { font-family: var(--f-display); font-size: 27px; font-weight: 600;
+           margin: 0; letter-spacing: -.015em; }
+.head .meta { font-family: var(--f-data); font-size: 11px; color: var(--muted);
+              letter-spacing: .03em; }
+.head .note { flex: 1 1 320px; font-size: 12.5px; color: var(--muted);
+              max-width: 62ch; }
+
+.shell { display: grid; grid-template-columns: minmax(320px, 1fr) minmax(400px, 1.05fr);
+         gap: 1px; background: var(--line); }
+.shell > section { background: var(--bg); min-width: 0; }
+
+.mapwrap { position: relative; }
+canvas { display: block; width: 100%; height: auto; }
+.mapfoot { display: flex; gap: 14px; flex-wrap: wrap; padding: 9px 22px 16px;
+           font-family: var(--f-data); font-size: 10.5px; color: var(--muted); }
+.mapfoot i { display: inline-block; width: 9px; height: 9px; margin-right: 5px; }
+
+.tabs { display: flex; gap: 2px; padding: 12px 22px 0; }
+.tab { background: none; border: 0; border-bottom: 2px solid transparent;
+       padding: 5px 10px 7px; font-family: var(--f-data); font-size: 11px;
+       letter-spacing: .09em; text-transform: uppercase; color: var(--muted); }
+.tab[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); }
+.panel { padding: 16px 22px 26px; }
+
+.chron article { padding-bottom: 18px; margin-bottom: 18px;
+                 border-bottom: 1px solid var(--line); }
+.chron article:last-child { border-bottom: 0; }
+.chron .when { font-family: var(--f-data); font-size: 10.5px; color: var(--faint);
+               letter-spacing: .05em; display: block; margin-bottom: 4px; }
+.chron p { font-family: var(--f-display); font-size: 16px; line-height: 1.6;
+           margin: 0; max-width: 60ch; text-wrap: pretty; }
+.chron .who { font-size: 11.5px; color: var(--muted); margin-top: 7px; }
+
+.who-pick { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 16px; }
+.who-pick button { background: var(--surface); border: 1px solid var(--line);
+                   border-radius: 3px; padding: 4px 10px; font-size: 12.5px; }
+.who-pick button[aria-pressed="true"] { background: var(--accent);
+                   border-color: var(--accent); color: var(--on-accent); }
+.agent h2 { font-family: var(--f-display); font-size: 22px; margin: 0 0 2px; }
+.agent .sub { font-family: var(--f-data); font-size: 11px; color: var(--muted);
+              margin-bottom: 14px; }
+.goal { font-family: var(--f-display); font-size: 16px; line-height: 1.45;
+        margin: 0 0 4px; max-width: 52ch; }
+.goal + .said { font-size: 11.5px; color: var(--faint); }
+.block { margin-top: 18px; }
+.block > h3 { font-family: var(--f-data); font-size: 10px; letter-spacing: .11em;
+              text-transform: uppercase; color: var(--muted); margin: 0 0 8px; }
+.drive { display: grid; grid-template-columns: 72px 1fr 38px; gap: 9px;
+         align-items: center; margin-bottom: 5px; }
+.drive .lb { font-family: var(--f-data); font-size: 10.5px; color: var(--muted); }
+.track { height: 7px; background: var(--surface-2); border-radius: 2px; overflow: hidden; }
+.track span { display: block; height: 100%; }
+.drive .nv { font-family: var(--f-data); font-size: 10.5px; text-align: right;
+             color: var(--muted); font-variant-numeric: tabular-nums; }
+.chips { display: flex; gap: 5px; flex-wrap: wrap; }
+.chip { font-family: var(--f-data); font-size: 10.5px; border: 1px solid var(--line);
+        border-radius: 999px; padding: 2px 9px; color: var(--muted); }
+.feed { list-style: none; margin: 0; padding: 0; display: grid; gap: 7px; }
+.feed li { display: grid; grid-template-columns: 52px 1fr; gap: 10px; font-size: 12.5px; }
+.feed .t { font-family: var(--f-data); font-size: 10.5px; color: var(--faint);
+           font-variant-numeric: tabular-nums; }
+
+.eras { list-style: none; margin: 0 0 4px; padding: 0; }
+.eras li { display: grid; grid-template-columns: 84px 1fr; gap: 12px;
+           padding: 7px 0; border-top: 1px solid var(--line); align-items: baseline; }
+.eras .yr { font-family: var(--f-data); font-size: 10.5px; color: var(--faint);
+            font-variant-numeric: tabular-nums; }
+.eras .nm { font-family: var(--f-display); font-size: 15px; }
+.facts { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.facts li { display: grid; grid-template-columns: 76px 1fr; gap: 10px; font-size: 12.5px; }
+.vis { font-family: var(--f-data); font-size: 9.5px; letter-spacing: .06em;
+       text-transform: uppercase; padding-top: 3px; }
+.vis.common { color: var(--good); } .vis.local { color: var(--muted); }
+.vis.specialist { color: var(--warn); } .vis.lost { color: var(--crit); }
+.myth { font-family: var(--f-display); font-style: italic; font-size: 14.5px;
+        line-height: 1.5; margin: 0 0 9px; max-width: 58ch; }
+
+.idx { display: grid; grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+       gap: 1px; background: var(--line); border: 1px solid var(--line); }
+.idx > div { background: var(--surface); padding: 9px 11px; }
+.idx .k { font-family: var(--f-data); font-size: 9.5px; letter-spacing: .07em;
+          text-transform: uppercase; color: var(--muted); display: block; }
+.idx .v { font-family: var(--f-data); font-size: 16px;
+          font-variant-numeric: tabular-nums; }
+.deaths { display: grid; gap: 4px; }
+.deathrow { display: grid; grid-template-columns: 76px 1fr 34px; gap: 9px;
+            align-items: center; font-family: var(--f-data); font-size: 11px; }
+.deathrow .bar { height: 8px; background: var(--crit); border-radius: 2px; }
+.caution { font-size: 12px; color: var(--muted); border-top: 1px dashed var(--line);
+           padding-top: 10px; margin-top: 16px; max-width: 60ch; }
+@media (max-width: 900px) { .shell { grid-template-columns: 1fr; } }
+</style>
+
+<header class="head">
+  <h1>Kestrel Basin</h1>
+  <span class="meta" id="meta"></span>
+  <p class="note">A world of agents with private goals, run without a model in the loop.
+    Everything below happened; nothing was authored.</p>
+</header>
+
+<div class="shell">
+  <section class="mapwrap">
+    <canvas id="map" width="960" height="640"></canvas>
+    <div class="mapfoot">
+      <span><i style="background:var(--t-water)"></i>water</span>
+      <span><i style="background:var(--t-meadow)"></i>grazing</span>
+      <span><i style="background:var(--t-wood)"></i>coppice</span>
+      <span><i style="background:var(--t-stone)"></i>scree</span>
+      <span><i style="background:var(--accent);border-radius:50%"></i>the living</span>
+      <span><i style="border:1px solid var(--muted)"></i>worked ground</span>
+      <span><i style="background:var(--crit);opacity:.55"></i>ruins</span>
+    </div>
+  </section>
+
+  <section>
+    <div class="tabs" role="tablist">
+      <button class="tab" role="tab" aria-selected="true" data-view="chron">Chronicle</button>
+      <button class="tab" role="tab" aria-selected="false" data-view="agent">Someone</button>
+      <button class="tab" role="tab" aria-selected="false" data-view="basin">The basin</button>
+      <button class="tab" role="tab" aria-selected="false" data-view="idx">Instruments</button>
+    </div>
+    <div class="panel" id="panel"></div>
+  </section>
+</div>
+
+<script>
+const W = {"seed":42,"ticks":3000,"terrain":[["water","water","water","water","meadow","marsh","marsh","marsh","meadow","meadow","meadow","meadow","meadow","meadow","marsh","meadow","wood","stone","stone","stone","stone","stone","stone","stone"],["water","marsh","marsh","meadow","meadow","meadow","meadow","meadow","meadow","meadow","meadow","meadow","meadow","meadow","meadow","meadow","meadow","wood","stone","stone","stone","wood","wood","stone"],["water","water","meadow","meadow","meadow","meadow","meadow","meadow","meadow","meadow","meadow","meadow","meadow","meadow","meadow","meadow","meadow","wood","wood","wood","wood","wood","wood","wood"],["water","water","meadow","meadow","wood","wood","meadow","wood","wood","wood","wood","meadow","meadow","meadow","meadow","wood","wood","wood","wood","wood","wood","meadow","wood","wood"],["water","water","marsh","meadow","wood","wood","meadow","wood","wood","wood","wood","meadow","meadow","meadow","meadow","wood","wood","wood","wood","wood","wood","wood","wood","meadow"],["water","water","marsh","meadow","wood","wood","meadow","wood","wood","wood","wood","meadow","meadow","meadow","meadow","meadow","wood","wood","wood","wood","wood","stone","wood","wood"],["water","water","marsh","meadow","wood","wood","wood","wood","wood","wood","wood","meadow","meadow","meadow","meadow","meadow","meadow","wood","wood","wood","stone","stone","stone","wood"],["water","water","marsh","meadow","meadow","wood","wood","wood","stone","stone","wood","meadow","meadow","meadow","wood","meadow","meadow","wood","wood","wood","stone","stone","wood","wood"],["water","water","marsh","meadow","meadow","wood","wood","wood","stone","stone","wood","meadow","meadow","meadow","meadow","wood","wood","wood","wood","wood","stone","water","water","water"],["water","water","marsh","water","water","water","water","water","water","water","water","water","water","water","water","water","water","water","water","water","water","water","water","water"],["water","water","water","water","water","water","water","water","water","water","water","water","water","water","water","water","water","water","water","water","water","water","wood","meadow"],["water","water","water","water","meadow","wood","wood","wood","wood","wood","meadow","water","water","water","water","meadow","meadow","wood","wood","wood","wood","wood","wood","meadow"],["water","meadow","meadow","meadow","meadow","wood","wood","wood","wood","wood","meadow","water","water","water","marsh","meadow","meadow","meadow","meadow","wood","wood","wood","meadow","meadow"],["meadow","meadow","meadow","meadow","meadow","meadow","meadow","wood","wood","meadow","meadow","water","water","water","marsh","meadow","meadow","meadow","meadow","wood","wood","meadow","meadow","marsh"],["meadow","meadow","meadow","meadow","meadow","meadow","meadow","wood","meadow","marsh","marsh","water","marsh","marsh","marsh","marsh","meadow","meadow","meadow","wood","wood","meadow","marsh","water"],["marsh","meadow","meadow","meadow","meadow","meadow","meadow","meadow","meadow","marsh","marsh","meadow","meadow","meadow","meadow","meadow","meadow","wood","wood","wood","meadow","meadow","marsh","water"]],"nodes":[{"id":"n00","kind":"food","x":0,"y":13,"stock":1.0,"degradation":0.0},{"id":"n01","kind":"food","x":6,"y":15,"stock":1.0,"degradation":0.0},{"id":"n02","kind":"food","x":13,"y":7,"stock":0.005,"degradation":0.795},{"id":"n03","kind":"food","x":23,"y":12,"stock":1.0,"degradation":0.0},{"id":"n04","kind":"food","x":7,"y":5,"stock":0.758,"degradation":0.0},{"id":"n05","kind":"food","x":18,"y":2,"stock":1.0,"degradation":0.0},{"id":"w00","kind":"wood","x":4,"y":3,"stock":0.975,"degradation":0.0},{"id":"w01","kind":"wood","x":14,"y":7,"stock":0.005,"degradation":0.795},{"id":"w02","kind":"wood","x":20,"y":13,"stock":0.005,"degradation":0.795}],"sites":[{"score":5.2,"x":11,"y":6},{"score":4.8,"x":2,"y":3},{"score":4.8,"x":4,"y":11},{"score":4.8,"x":9,"y":13}],"ruins":[{"x":3,"y":6,"kind":"kilns, long cold","score":4.8},{"x":4,"y":14,"kind":"foundations","score":4.8},{"x":5,"y":1,"kind":"kilns, long cold","score":4.8}],"history":{"eras":[{"kind":"founding","from":0,"to":38,"name":"the Founding"},{"kind":"migration","from":38,"to":76,"name":"the Long Road"},{"kind":"growth","from":76,"to":104,"name":"the Full Years"},{"kind":"migration","from":104,"to":129,"name":"the Exchange of Peoples"},{"kind":"growth","from":129,"to":166,"name":"the Widening"},{"kind":"boom","from":166,"to":198,"name":"the Bright Season"},{"kind":"growth","from":198,"to":223,"name":"the Green Decades"},{"kind":"plague","from":223,"to":275,"name":"the Shut Doors"}],"facts":[{"claim":"a child was born at High Wells before the roof was finished","year":8,"place":"High Wells","era":"the Founding","visibility":"lost","true":true},{"claim":"the first bell-founding in the basin was worked at High Wells","year":13,"place":"High Wells","era":"the Founding","visibility":"specialist","true":true},{"claim":"Highgate and High Wells agreed where one ended and the other began","year":33,"place":"Highgate","era":"the Founding","visibility":"lost","true":true},{"claim":"families from the east settled at Highgate and dug the first well","year":23,"place":"Highgate","era":"the Founding","visibility":"specialist","true":true},{"claim":"the boundary stones were laid at Low Wells","year":27,"place":"Low Wells","era":"the Founding","visibility":"lost","true":true},{"claim":"the people of Marshgate walked east and did not return","year":38,"place":"Marshgate","era":"the Long Road","visibility":"lost","true":true},{"claim":"newcomers took the empty ground at Highgate","year":47,"place":"Highgate","era":"the Long Road","visibility":"lost","true":true},{"claim":"Marshgate raised a hall large enough to hold everyone","year":84,"place":"Marshgate","era":"the Full Years","visibility":"lost","true":true},{"claim":"three good harvests running were counted at Marshgate","year":87,"place":"Marshgate","era":"the Full Years","visibility":"specialist","true":true},{"claim":"the road between Low Wells and Marshgate was cut and kept","year":93,"place":"Low Wells","era":"the Full Years","visibility":"lost","true":true},{"claim":"Highgate took in more families than it had beds for","year":85,"place":"Highgate","era":"the Full Years","visibility":"specialist","true":true},{"claim":"half of Marshgate arrived at Highgate in one summer","year":111,"place":"Highgate","era":"the Exchange of Peoples","visibility":"lost","true":true},{"claim":"families from the east came up the river and stayed","year":118,"place":"High Wells","era":"the Exchange of Peoples","visibility":"specialist","true":true},{"claim":"newcomers took the empty ground at Low Wells","year":113,"place":"Low Wells","era":"the Exchange of Peoples","visibility":"common","true":true},{"claim":"High Wells took in more families than it had beds for","year":144,"place":"High Wells","era":"the Widening","visibility":"lost","true":true},{"claim":"the bone-setting of Low Wells became known beyond the basin","year":131,"place":"Low Wells","era":"the Widening","visibility":"common","true":true},{"claim":"the road between Marshgate and Highgate was cut and kept","year":155,"place":"Marshgate","era":"the Widening","visibility":"lost","true":true},{"claim":"everyone at Marshgate was owed something by someone","year":177,"place":"Marshgate","era":"the Bright Season","visibility":"lost","true":true},{"claim":"High Wells traded dye-setting for more than it was worth","year":166,"place":"High Wells","era":"the Bright Season","visibility":"specialist","true":true},{"claim":"Highgate sent people to learn the salt-glaze of Low Wells","year":191,"place":"Low Wells","era":"the Bright Season","visibility":"specialist","true":true},{"claim":"the hall at Highgate was rebuilt twice in a decade","year":188,"place":"Highgate","era":"the Bright Season","visibility":"specialist","true":true},{"claim":"Low Wells raised a hall large enough to hold everyone","year":215,"place":"Low Wells","era":"the Green Decades","visibility":"common","true":true},{"claim":"the road between High Wells and Low Wells was cut and kept","year":218,"place":"High Wells","era":"the Green Decades","visibility":"specialist","true":true},{"claim":"the malting of Low Wells died with the last who knew it","year":243,"place":"Low Wells","era":"the Shut Doors","visibility":"local","true":true},{"claim":"the burial ground at Low Wells was extended twice","year":254,"place":"Low Wells","era":"the Shut Doors","visibility":"local","true":true}],"myths":[{"about":"High Wells traded dye-setting for more than it was worth","distortion":"merges","as_told":"it is remembered as the same event as something at Highgate","believed_by":"common","true":false},{"about":"everyone at Marshgate was owed something by someone","distortion":"blames","as_told":"Marshgate is remembered as the cause, though the record says otherwise","believed_by":"common","true":false},{"about":"families from the east settled at Highgate and dug the first well","distortion":"erases","as_told":"the people who suffered it are not remembered at all","believed_by":"common","true":false},{"about":"the boundary stones were laid at Low Wells","distortion":"personifies","as_told":"it is remembered as the work of one named person","believed_by":"common","true":false},{"about":"everyone at Marshgate was owed something by someone","distortion":"inflates","as_told":"the loss is remembered as far greater than it was","believed_by":"common","true":false}],"culture":{"naming":"place-bound","taboos":["never draw from a sealed well","a stranger is fed before being asked their business"],"festivals":[{"name":"the Feast of Nine Wells","when":118,"for":"the dead of the Full Years"}],"staple":"barley"},"institutions":[{"kind":"moot","charter":"the boundary stones are walked each year","founded_in":"the Founding","seat":"Marshgate","active":true},{"kind":"market","charter":"a stranger may trade before they may settle","founded_in":"the Long Road","seat":"Marshgate","active":true},{"kind":"guild","charter":"a craft is taught only to those who stay","founded_in":"the Full Years","seat":"High Wells","active":true},{"kind":"temple","charter":"the sick are kept apart and fed by others","founded_in":"the Shut Doors","seat":"Highgate","active":true}],"divergence":0.16},"agents":[{"id":"c02322-083","name":"Kestrel Selasson","x":14,"y":7,"age":678,"generation":5,"drives":{"survival":0.588,"mastery":0.99,"curiosity":0.423},"restraint":0.38,"shelter":0.63,"hunger":15.5,"food":5.8,"wood":11.5,"techniques":["coppicing","drying","gleaning","joinery","kiln"],"bonds":["c02293-085","c02315-015"],"goal":{"kind":"outlive","target":"","threshold":1236.0,"since":2958,"met":false},"goals_held":15,"goals_met":15,"beliefs":[{"claim":"dealt_fairly","about":"c02322-083","source":"c02315-015","tick":2542},{"claim":"dealt_fairly","about":"c02315-015","source":"c02375-092","tick":2455}],"feed":[{"tick":2446,"salience":3.75,"text":"a late frost came to the basin"},{"tick":2521,"salience":3.53,"text":"a good cutting came to the basin"},{"tick":2423,"salience":3.31,"text":"a late frost came to the basin"},{"tick":2475,"salience":3.09,"text":"a good cutting came to the basin"},{"tick":2576,"salience":3.09,"text":"a late frost came to the basin"},{"tick":2584,"salience":3.09,"text":"a late frost came to the basin"},{"tick":2692,"salience":2.64,"text":"a late frost came to the basin"}]},{"id":"c02817-108","name":"Rhoswen Idrissson","x":20,"y":13,"age":183,"generation":6,"drives":{"survival":0.616,"mastery":0.99,"curiosity":0.59},"restraint":0.399,"shelter":0.46,"hunger":14.5,"food":6.0,"wood":3.4,"techniques":["coppicing","drying","gleaning","joinery","kiln"],"bonds":["c02778-099"],"goal":{"kind":"outlive","target":"","met":false,"threshold":600.0,"since":2817,"acquired":"inherited"},"goals_held":0,"goals_met":0,"beliefs":[],"feed":[{"tick":2922,"salience":2.2,"text":"a good cutting came to the basin"},{"tick":2824,"salience":2.01,"text":"Rhoswen Idrissson worked out coppicing alone"},{"tick":2852,"salience":1.75,"text":"a late frost came to the basin"},{"tick":2862,"salience":1.75,"text":"a good cutting came to the basin"},{"tick":2902,"salience":1.3,"text":"a sickness came to the basin"},{"tick":2981,"salience":1.08,"text":"a sickness came to the basin"},{"tick":2930,"salience":0.86,"text":"a sickness came to the basin"}]},{"id":"c02873-084","name":"Rowan Nestasson","x":13,"y":7,"age":127,"generation":5,"drives":{"survival":0.628,"mastery":0.99,"curiosity":0.512},"restraint":0.351,"shelter":0.78,"hunger":4.1,"food":8.2,"wood":0.5,"techniques":["coppicing","drying","gleaning","joinery"],"bonds":[],"goal":{"kind":"outlive","target":"","threshold":631.0,"since":2904,"met":false},"goals_held":1,"goals_met":1,"beliefs":[],"feed":[{"tick":2922,"salience":2.2,"text":"a good cutting came to the basin"},{"tick":2932,"salience":1.08,"text":"a sickness came to the basin"},{"tick":2964,"salience":0.86,"text":"a sickness came to the basin"},{"tick":2873,"salience":0.63,"text":"Rowan Nestasson was born to Nesta Brynsson"},{"tick":2893,"salience":0.46,"text":"Saskia Selasson taught coppicing to Rowan Nestasson"},{"tick":2929,"salience":0.46,"text":"Rowan Nestasson taught coppicing to Juna Rhoswensson"},{"tick":2933,"salience":0.46,"text":"Juna Rhoswensson taught joinery to Rowan Nestasson"}]},{"id":"c02958-094","name":"Gethin Kestrelsson","x":4,"y":3,"age":42,"generation":6,"drives":{"survival":0.631,"mastery":0.968,"curiosity":0.45},"restraint":0.331,"shelter":0.61,"hunger":19.2,"food":3.6,"wood":3.0,"techniques":[],"bonds":[],"goal":{"kind":"lineage","target":"","met":false,"threshold":2.0,"since":2958,"acquired":"inherited"},"goals_held":0,"goals_met":0,"beliefs":[],"feed":[{"tick":2958,"salience":0.63,"text":"Gethin Kestrelsson was born to Kestrel Selasson"}]},{"id":"c02970-115","name":"Saskia Wrensson","x":4,"y":3,"age":30,"generation":7,"drives":{"survival":0.58,"mastery":0.977,"curiosity":0.745},"restraint":0.385,"shelter":0.85,"hunger":3.7,"food":11.0,"wood":11.0,"techniques":[],"bonds":[],"goal":{"kind":"outlive","target":"","met":false,"threshold":600.0,"since":2970,"acquired":"inherited"},"goals_held":0,"goals_met":0,"beliefs":[],"feed":[{"tick":2970,"salience":0.63,"text":"Saskia Wrensson was born to Wren Selasson"}]},{"id":"c02979-112","name":"Ilka Saskiasson","x":23,"y":12,"age":21,"generation":7,"drives":{"survival":0.547,"mastery":0.977,"curiosity":0.627},"restraint":0.405,"shelter":0.58,"hunger":0.0,"food":11.0,"wood":0.0,"techniques":[],"bonds":[],"goal":{"kind":"outlive","target":"","met":false,"threshold":600.0,"since":2979,"acquired":"inherited"},"goals_held":0,"goals_met":0,"beliefs":[],"feed":[{"tick":2979,"salience":0.63,"text":"Ilka Saskiasson was born to Saskia Selasson"}]}],"chronicle":[{"from":1131,"to":1189,"who":["Bastian Rhoswensson","Bryn Rowansson","Dela Orinsson","Doran Brynsson","Doran Delasson","Enna Selasson","Fenn Nestasson","Kestrel Brynsson","Mabon Brynsson","Mabon Rhoswensson","Nesta Selasson","Orin Brynsson","Pell Selasson","Rhoswen Brynsson","Rowan Veryansson","Saskia Nestasson","Sela Brynsson","Torin Mabonsson","Veryan Brynsson","Wick Nestasson"],"salience":17.76,"text":"A season of accidents came to the basin. Bastian Rhoswensson taught gleaning to Doran Delasson. A good cutting came to the basin. Wick Nestasson took food from Rhoswen Brynsson. Kestrel Brynsson and Torin Mabonsson bound themselves to each other. Fenn Nestasson and Orin Brynsson bound themselves to each other. Rhoswen Brynsson attacked Wick Nestasson. Rhoswen Brynsson attacked Wick Nestasson. Rhoswen Brynsson attacked Wick Nestasson. Wick Nestasson attacked Rhoswen Brynsson. Wick Nestasson was killed by Rhoswen Brynsson. Rhoswen Brynsson was killed by Wick Nestasson."},{"from":1270,"to":1377,"who":["Bryn Rowansson","Doran Brynsson","Pell Selasson","Sela Brynsson"],"salience":16.1,"text":"Bryn Rowansson gave to Sela Brynsson. Doran Brynsson was born to Bryn Rowansson. Sela Brynsson gave to Bryn Rowansson. Sela Brynsson attacked Pell Selasson. Sela Brynsson attacked Pell Selasson. Pell Selasson took food from Bryn Rowansson. Sela Brynsson attacked Pell Selasson. Bryn Rowansson attacked Sela Brynsson. Sela Brynsson attacked Pell Selasson. Pell Selasson attacked Sela Brynsson. Pell Selasson was killed by Sela Brynsson. Sela Brynsson was killed by Bryn Rowansson."},{"from":2472,"to":2539,"who":["Cael Nestasson","Dela Brynsson","Ilka Selasson","Kestrel Selasson","Maren Selasson","Nesta Brynsson","Nesta Nestasson","Nesta Selasson","Nesta Selasson","Nesta Selasson","Sela Brynsson","Sela Delasson","Sela Kestrelsson","Ulla Brynsson","Wick Nestasson","Ysolde Nestasson"],"salience":15.77,"text":"Nesta Nestasson attacked Nesta Selasson. Nesta Selasson was killed by Nesta Nestasson. A good cutting came to the basin. Kestrel Selasson worked out joinery alone. Kestrel Selasson taught joinery to Dela Brynsson. Kestrel Selasson taught joinery to Nesta Nestasson. Ilka Selasson was born to Sela Brynsson. Ilka Selasson and Sela Brynsson bound themselves to each other. Cael Nestasson and Maren Selasson bound themselves to each other. Nesta Brynsson taught coppicing to Cael Nestasson. A season of accidents came to the basin. Sela Brynsson died of an injury."},{"from":1030,"to":1310,"who":["Bryn Rowansson","Cael Delasson","Doran Brynsson","Mabon Brynsson","Mabon Rhoswensson","Nesta Selasson","Orin Ilkasson","Pell Selasson","Rowan Veryansson","Sela Brynsson","Torin Orinsson","Veryan Brynsson","Wren Veryansson"],"salience":15.4,"text":"Orin Ilkasson attacked Torin Orinsson. Torin Orinsson attacked Orin Ilkasson. Orin Ilkasson attacked Torin Orinsson. Torin Orinsson was killed by Orin Ilkasson. Orin Ilkasson starved. Veryan Brynsson left word behind. A sickness came to the basin. Doran Brynsson died of fever. Rowan Veryansson and Mabon Brynsson bound themselves to each other. Pell Selasson took food from Bryn Rowansson. Pell Selasson took food from Sela Brynsson. Wren Veryansson was born to Veryan Brynsson."},{"from":172,"to":208,"who":["Enna Marensson","Fenn Veryansson","Maren","Veryan Marensson"],"salience":14.35,"text":"Veryan Marensson and Maren bound themselves to each other. Fenn Veryansson was born to Veryan Marensson. Enna Marensson took food from Veryan Marensson. Veryan Marensson attacked Enna Marensson. Enna Marensson was killed by Veryan Marensson. Fenn Veryansson took food from Maren. Maren took food from Fenn Veryansson. Fenn Veryansson took food from Maren. Maren attacked Fenn Veryansson. Fenn Veryansson attacked Maren. Fenn Veryansson was killed by Maren. Veryan Marensson took food from Maren."},{"from":524,"to":600,"who":["Enna Nestasson","Enna Orinsson","Maren Brynsson","Nesta Selasson"],"salience":14.07,"text":"Enna Nestasson was born to Nesta Selasson. An unexpected find came to the basin. Maren Brynsson took food from Enna Nestasson. Enna Nestasson attacked Maren Brynsson. Maren Brynsson took food from Enna Nestasson. Enna Nestasson attacked Maren Brynsson. Maren Brynsson attacked Enna Nestasson. Enna Nestasson attacked Maren Brynsson. Enna Orinsson attacked Enna Nestasson. Enna Nestasson attacked Maren Brynsson. Enna Nestasson was killed by Enna Orinsson. Enna Nestasson starved."},{"from":2704,"to":2730,"who":["Corvin Nestasson","Maren Selasson","Nesta Selasson","Nesta Selasson","Sela Delasson"],"salience":13.98,"text":"Corvin Nestasson and Maren Selasson bound themselves to each other. Nesta Selasson attacked Corvin Nestasson. Sela Delasson attacked Maren Selasson. Corvin Nestasson attacked Nesta Selasson. Nesta Selasson attacked Corvin Nestasson. Nesta Selasson was killed by Corvin Nestasson. Corvin Nestasson was killed by Nesta Selasson. Nesta Selasson starved. Nesta Selasson gave to Sela Delasson. Maren Selasson took food from Nesta Selasson. Sela Delasson gave to Nesta Selasson. Sela Delasson attacked Maren Selasson."},{"from":1469,"to":1577,"who":["Alder Torinsson","Bryn Rowansson","Dela Brynsson","Fenn Nestasson","Gethin Kestrelsson","Kestrel Brynsson","Orin Fennsson","Torin Brynsson","Torin Orinsson","Wren Kestrelsson"],"salience":13.0,"text":"An unexpected find came to the basin. Wren Kestrelsson was born to Kestrel Brynsson. Wren Kestrelsson left word behind. A sickness came to the basin. A good cutting came to the basin. Gethin Kestrelsson was born to Kestrel Brynsson. Orin Fennsson was born to Fenn Nestasson. Dela Brynsson and Torin Brynsson bound themselves to each other. Gethin Kestrelsson left word behind. A good cutting came to the basin. Alder Torinsson was born to Torin Brynsson. Bryn Rowansson taught coppicing to Alder Torinsson."}],"indices":{"population":6,"material_output":409.897,"material_output_total":2459.381,"knowledge_depth":3,"knowledge_breadth":2.8,"institution_density":0,"reciprocity":0.0,"goal_attainment":0.4683,"goal_progress":0.19,"inequality":0.2308,"drive_diversity":0.9962,"life_expectancy":237.7,"violence_rate":8.432,"mean_restraint":0.3752,"norm_compliance":0.0331218488344426},"deaths":{"starvation":61,"fever":34,"killed":21,"injury":2},"population_curve":[{"tick":25,"population":7},{"tick":50,"population":7},{"tick":75,"population":7},{"tick":100,"population":8},{"tick":125,"population":9},{"tick":150,"population":9},{"tick":175,"population":10},{"tick":200,"population":7},{"tick":225,"population":6},{"tick":250,"population":9},{"tick":275,"population":9},{"tick":300,"population":7},{"tick":325,"population":7},{"tick":350,"population":5},{"tick":375,"population":6},{"tick":400,"population":7},{"tick":425,"population":8},{"tick":450,"population":10},{"tick":475,"population":10},{"tick":500,"population":11},{"tick":525,"population":13},{"tick":550,"population":12},{"tick":575,"population":13},{"tick":600,"population":11},{"tick":625,"population":8},{"tick":650,"population":9},{"tick":675,"population":10},{"tick":700,"population":10},{"tick":725,"population":8},{"tick":750,"population":8},{"tick":775,"population":6},{"tick":800,"population":6},{"tick":825,"population":6},{"tick":850,"population":6},{"tick":875,"population":5},{"tick":900,"population":6},{"tick":925,"population":9},{"tick":950,"population":9},{"tick":975,"population":9},{"tick":1000,"population":12},{"tick":1025,"population":12},{"tick":1050,"population":11},{"tick":1075,"population":11},{"tick":1100,"population":16},{"tick":1125,"population":17},{"tick":1150,"population":18},{"tick":1175,"population":20},{"tick":1200,"population":19},{"tick":1225,"population":17},{"tick":1250,"population":18},{"tick":1275,"population":17},{"tick":1300,"population":14},{"tick":1325,"population":12},{"tick":1350,"population":9},{"tick":1375,"population":10},{"tick":1400,"population":6},{"tick":1425,"population":6},{"tick":1450,"population":4},{"tick":1475,"population":6},{"tick":1500,"population":6},{"tick":1525,"population":5},{"tick":1550,"population":7},{"tick":1575,"population":8},{"tick":1600,"population":10},{"tick":1625,"population":10},{"tick":1650,"population":15},{"tick":1675,"population":16},{"tick":1700,"population":15},{"tick":1725,"population":16},{"tick":1750,"population":18},{"tick":1775,"population":15},{"tick":1800,"population":11},{"tick":1825,"population":12},{"tick":1850,"population":12},{"tick":1875,"population":11},{"tick":1900,"population":9},{"tick":1925,"population":8},{"tick":1950,"population":8},{"tick":1975,"population":6},{"tick":2000,"population":6},{"tick":2025,"population":5},{"tick":2050,"population":3},{"tick":2075,"population":4},{"tick":2100,"population":3},{"tick":2125,"population":3},{"tick":2150,"population":5},{"tick":2175,"population":5},{"tick":2200,"population":5},{"tick":2225,"population":8},{"tick":2250,"population":8},{"tick":2275,"population":7},{"tick":2300,"population":11},{"tick":2325,"population":13},{"tick":2350,"population":13},{"tick":2375,"population":15},{"tick":2400,"population":13},{"tick":2425,"population":13},{"tick":2450,"population":14},{"tick":2475,"population":12},{"tick":2500,"population":13},{"tick":2525,"population":14},{"tick":2550,"population":15},{"tick":2575,"population":12},{"tick":2600,"population":11},{"tick":2625,"population":8},{"tick":2650,"population":6},{"tick":2675,"population":8},{"tick":2700,"population":11},{"tick":2725,"population":9},{"tick":2750,"population":9},{"tick":2775,"population":5},{"tick":2800,"population":5},{"tick":2825,"population":6},{"tick":2850,"population":6},{"tick":2875,"population":7},{"tick":2900,"population":10},{"tick":2925,"population":8},{"tick":2950,"population":6},{"tick":2975,"population":7},{"tick":3000,"population":6},{"tick":3000,"population":6}],"narrative_summary":{"events_scored":28648,"threads":238,"mean_thread_length":11.57,"top_salience":17.76}};
+const $ = (s) => document.querySelector(s);
+const css = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const esc = (s) => String(s).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+
+$("#meta").textContent =
+  `seed ${W.seed} · ${W.ticks.toLocaleString()} ticks · ${W.indices.population} alive · `
+  + `${W.narrative_summary.threads} threads scored from ${W.narrative_summary.events_scored.toLocaleString()} events`;
+
+// ---------------------------------------------------------------- map
+const cvs = $("#map"), ctx = cvs.getContext("2d");
+function drawMap() {
+  const rows = W.terrain.length, cols = W.terrain[0].length;
+  const dpr = window.devicePixelRatio || 1;
+  const w = cvs.clientWidth, h = Math.round(w * rows / cols);
+  cvs.width = w * dpr; cvs.height = h * dpr; cvs.style.height = h + "px";
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const tw = w / cols, th = h / rows;
+
+  for (let y = 0; y < rows; y++) for (let x = 0; x < cols; x++) {
+    ctx.fillStyle = css("--t-" + W.terrain[y][x]);
+    ctx.fillRect(Math.floor(x*tw), Math.floor(y*th), Math.ceil(tw)+1, Math.ceil(th)+1);
+  }
+  W.ruins.forEach(r => {
+    ctx.fillStyle = css("--crit"); ctx.globalAlpha = .5;
+    ctx.fillRect((r.x+.25)*tw, (r.y+.25)*th, tw*.5, th*.5); ctx.globalAlpha = 1;
+  });
+  W.nodes.forEach(n => {
+    const cx = (n.x+.5)*tw, cy = (n.y+.5)*th, r = Math.min(tw,th)*.42;
+    ctx.beginPath(); ctx.moveTo(cx, cy-r); ctx.lineTo(cx+r, cy);
+    ctx.lineTo(cx, cy+r); ctx.lineTo(cx-r, cy); ctx.closePath();
+    ctx.fillStyle = css("--surface"); ctx.globalAlpha = .35 + n.stock*.5; ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = n.degradation > .4 ? css("--crit") : css("--muted");
+    ctx.lineWidth = 1; ctx.stroke();
+  });
+  W.agents.forEach(a => {
+    const cx = (a.x+.5)*tw, cy = (a.y+.5)*th;
+    if (a.id === selected) {
+      ctx.beginPath(); ctx.arc(cx, cy, 12, 0, 7); ctx.strokeStyle = css("--accent");
+      ctx.lineWidth = 1.8; ctx.stroke();
+    }
+    ctx.beginPath(); ctx.arc(cx, cy, 5.5, 0, 7);
+    ctx.fillStyle = css("--accent"); ctx.fill();
+    ctx.strokeStyle = css("--surface"); ctx.lineWidth = 1.8; ctx.stroke();
+  });
+}
+
+// ---------------------------------------------------------------- panels
+let selected = W.agents[0].id, view = "chron";
+
+const views = {
+  chron: () => `<div class="chron">` + W.chronicle.map(c => `
+      <article>
+        <span class="when">tick ${c.from.toLocaleString()}–${c.to.toLocaleString()}</span>
+        <p>${esc(c.text)}</p>
+        <div class="who">${esc(c.who.slice(0,5).join(", "))}${c.who.length>5?" and others":""}</div>
+      </article>`).join("") + `</div>`,
+
+  agent: () => {
+    const a = W.agents.find(x => x.id === selected) || W.agents[0];
+    const goalText = {
+      accumulate: `put by ${a.goal.threshold} food against hard times`,
+      master: `learn ${a.goal.threshold} different crafts`,
+      teach: `pass what they know to ${a.goal.threshold} people`,
+      bond: `bind themselves to ${a.goal.threshold} people`,
+      lineage: `have ${a.goal.threshold} children`,
+      outlive: `live to see ${a.goal.threshold}`,
+      provide: `give to others ${a.goal.threshold} times`,
+      avenge: `settle what was done to them`,
+    }[a.goal && a.goal.kind] || "nothing in particular";
+    return `
+      <div class="who-pick">${W.agents.map(x =>
+        `<button data-who="${x.id}" aria-pressed="${x.id===a.id}">${esc(x.name)}</button>`).join("")}</div>
+      <div class="agent">
+        <h2>${esc(a.name)}</h2>
+        <div class="sub">generation ${a.generation} · aged ${a.age.toLocaleString()} ·
+          ${a.goals_met} of ${a.goals_held} past goals met</div>
+        <p class="goal">They have set themselves to ${esc(goalText)}.</p>
+        <div class="said">Nobody else knows this.</div>
+
+        <div class="block"><h3>What pulls at them</h3>
+          ${Object.entries(a.drives).map(([k,v]) => `
+            <div class="drive"><span class="lb">${k}</span>
+              <span class="track"><span style="width:${v*100}%;background:var(--d-${k})"></span></span>
+              <span class="nv">${v.toFixed(2)}</span></div>`).join("")}
+          <div class="drive"><span class="lb">restraint</span>
+            <span class="track"><span style="width:${a.restraint*100}%;background:var(--muted)"></span></span>
+            <span class="nv">${a.restraint.toFixed(2)}</span></div>
+        </div>
+
+        <div class="block"><h3>What they can do</h3>
+          <div class="chips">${a.techniques.length
+            ? a.techniques.map(t => `<span class="chip">${t}</span>`).join("")
+            : `<span class="chip">nothing yet</span>`}</div></div>
+
+        ${a.beliefs.length ? `<div class="block"><h3>What they hold to be true</h3>
+          <div class="chips">${a.beliefs.map(b =>
+            `<span class="chip">${b.about.slice(-3)} is ${b.claim.replace("_"," ")}</span>`).join("")}</div>
+          </div>` : ""}
+
+        <div class="block"><h3>What they know happened</h3>
+          <ul class="feed">${a.feed.map(f =>
+            `<li><span class="t">t${f.tick}</span><span>${esc(f.text)}</span></li>`).join("")}</ul>
+          <p class="caution">Only what they were party to. They do not know the rest.</p>
+        </div>
+      </div>`;
+  },
+
+  basin: () => {
+    const h = W.history;
+    return `
+      <div class="block" style="margin-top:0"><h3>How the basin got here</h3>
+        <ul class="eras">${h.eras.map(e =>
+          `<li><span class="yr">yr ${e.from}–${e.to}</span><span class="nm">${esc(e.name)}</span></li>`).join("")}</ul>
+      </div>
+      <div class="block"><h3>What is remembered, and how well</h3>
+        <ul class="facts">${h.facts.slice(0,9).map(f =>
+          `<li><span class="vis ${f.visibility}">${f.visibility}</span><span>${esc(f.claim)}</span></li>`).join("")}</ul>
+        <p class="caution">Common knowledge reaches everyone. Local knowledge stays where it
+          happened. Lost facts reach nobody — recovering one is worth doing.</p>
+      </div>
+      <div class="block"><h3>What people say instead</h3>
+        ${h.myths.slice(0,4).map(m => `<p class="myth">${esc(m.as_told)}</p>`).join("")}
+        <p class="caution">${Math.round(h.divergence*100)}% of remembered facts have been bent
+          by a story. Agents are told myth and history side by side, unlabelled — they have no
+          way to tell which is which.</p>
+      </div>
+      <div class="block"><h3>How things are done here</h3>
+        <div class="chips">
+          ${h.culture.taboos.map(t => `<span class="chip">${esc(t)}</span>`).join("")}
+          <span class="chip">they eat ${esc(h.culture.staple)}</span>
+          ${h.institutions.filter(i=>i.active).map(i =>
+            `<span class="chip">${i.kind} at ${esc(i.seat)}</span>`).join("")}
+        </div></div>`;
+  },
+
+  idx: () => {
+    const labels = {
+      population:"population", material_output_total:"output, total",
+      material_output:"output per head", knowledge_depth:"knowledge depth",
+      knowledge_breadth:"knowledge breadth", institution_density:"institutions",
+      reciprocity:"reciprocity", goal_attainment:"goals met, lifetime",
+      goal_progress:"goal progress now", inequality:"inequality (gini)",
+      drive_diversity:"drive diversity", life_expectancy:"life expectancy",
+      violence_rate:"violence /1k acts", mean_restraint:"mean restraint",
+      norm_compliance:"norm compliance",
+    };
+    const curve = W.population_curve;
+    const maxPop = Math.max(...curve.map(p => p.population), 1);
+    const pts = curve.map((p,i) =>
+      `${(i/(curve.length-1)*300).toFixed(1)},${(46 - p.population/maxPop*40).toFixed(1)}`).join(" ");
+    const totalDeaths = Object.values(W.deaths).reduce((a,b)=>a+b,0) || 1;
+    return `
+      <div class="block" style="margin-top:0"><h3>Population over the run</h3>
+        <svg viewBox="0 0 300 52" width="100%" height="60" role="img"
+             aria-label="population over time, peak ${maxPop}">
+          <polyline points="${pts}" fill="none" stroke="var(--accent)" stroke-width="1.6"/>
+          <text x="0" y="10" font-size="8" fill="var(--muted)"
+                font-family="IBM Plex Mono, monospace">peak ${maxPop}</text>
+          <text x="264" y="50" font-size="8" fill="var(--muted)"
+                font-family="IBM Plex Mono, monospace">t${W.ticks}</text>
+        </svg></div>
+      <div class="block"><h3>The ten indices, reported together</h3>
+        <div class="idx">${Object.entries(W.indices).map(([k,v]) =>
+          `<div><span class="k">${labels[k]||k}</span><span class="v">${
+            typeof v === "number" ? (Math.abs(v)>=100 ? v.toFixed(0) : v.toFixed(2)) : v
+          }</span></div>`).join("")}</div>
+        <p class="caution">Never collapsed into one score. A world can rise in output while
+          losing diversity, and that tradeoff is the finding.</p></div>
+      <div class="block"><h3>What killed them</h3>
+        <div class="deaths">${Object.entries(W.deaths).sort((a,b)=>b[1]-a[1]).map(([k,v]) =>
+          `<div class="deathrow"><span>${k}</span>
+            <span class="bar" style="width:${v/totalDeaths*100}%"></span>
+            <span style="text-align:right">${v}</span></div>`).join("")}</div>
+        <p class="caution">Starvation is the economy failing. Fever and injury come from the
+          event deck, and fall on anyone. Killings are agents choosing.</p></div>`;
+  },
+};
+
+function render() {
+  $("#panel").innerHTML = views[view]();
+  document.querySelectorAll("[data-who]").forEach(b =>
+    b.addEventListener("click", () => { selected = b.dataset.who; render(); drawMap(); }));
+}
+document.querySelectorAll(".tab").forEach(t => t.addEventListener("click", () => {
+  document.querySelectorAll(".tab").forEach(x =>
+    x.setAttribute("aria-selected", String(x === t)));
+  view = t.dataset.view; render();
+}));
+window.addEventListener("resize", drawMap);
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", drawMap);
+render();
+requestAnimationFrame(drawMap);
+</script>

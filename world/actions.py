@@ -7,6 +7,7 @@ non-fungible resources at different places, both of them needed.
 """
 
 from . import goals, knowledge
+from .genesis import NAMES
 from .state import (
     BOND_RADIUS,
     COERCE_TAKE,
@@ -141,10 +142,10 @@ def reproduce(world: World, agent: Agent, rng, log, witness_count: int = 0, opp:
         # ids grow with every generation, which costs real tokens once these
         # appear in rendered prompts.
         id=f"c{world.tick:05d}-{world.agents.index(agent):03d}",
-        # Patronymic from the parent's *root* name. Appending unconditionally
-        # compounds every generation into "Bastianssonssonssonsson" — the same
-        # unbounded-string bug as the child ids, and it costs prompt tokens.
-        name=f"{agent.name.split('sson')[0]}sson",
+        # A given name of their own, plus the parent's given name as patronymic.
+        # Deriving the whole name from the parent collapses every lineage onto
+        # one word and makes any chronicle unreadable.
+        name=f"{NAMES[world.tick % len(NAMES)]} {agent.name.split()[0]}sson",
         x=agent.x,
         y=agent.y,
         drives={k: round(max(0.05, min(0.99, v + rng.uniform(-DRIVE_INHERIT_NOISE,

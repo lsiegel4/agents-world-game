@@ -22,6 +22,26 @@ from world.sim import run
 
 # The full §7.1 vector. Kept in one place so every command reports the same
 # thing — a study that quietly drops indices is how a tradeoff gets hidden.
+# Every social result before 2026-09-04 was measured with 5 founders. At that
+# size institution_density and reciprocity are structurally zero — bonds die
+# with their members and no group survives. §12 puts the design's target at
+# 100-300. This is the canonical scale condition; studies run against it so the
+# numbers are comparable to each other rather than to a world too small to show
+# the phenomena being measured.
+SCALE = {
+    "agents": 120, "sites": 12,
+    "width": 120, "height": 60,
+    "food_nodes": 40, "wood_nodes": 20,
+}
+
+
+def scaled(extra=None):
+    cfg = dict(SCALE)
+    if extra:
+        cfg.update(extra)
+    return cfg
+
+
 INDEX_KEYS = ["population", "material_output", "material_output_total",
               "knowledge_depth", "knowledge_breadth", "institution_density",
               "reciprocity", "goal_attainment", "goal_progress",
@@ -40,7 +60,7 @@ def collect(seeds: int, ticks: int, config: dict = None) -> dict:
 
 
 def cmd_indices(args):
-    data = collect(args.seeds, args.ticks)
+    data = collect(args.seeds, args.ticks, scaled() if args.scale else None)
     print(f"§7.1 index vector · {args.seeds} seeds · {args.ticks} ticks\n")
     print(f"{'index':<18} {'mean':>9} {'sd':>8} {'min':>8} {'max':>8}")
     for k in INDEX_KEYS:
@@ -54,8 +74,9 @@ def cmd_indices(args):
 
 def cmd_ablation(args):
     arm = args.arm
-    on, off = collect(args.seeds, args.ticks, {arm: True}), \
-              collect(args.seeds, args.ticks, {arm: False})
+    base = scaled if args.scale else (lambda extra=None: dict(extra or {}))
+    on = collect(args.seeds, args.ticks, base({arm: True}))
+    off = collect(args.seeds, args.ticks, base({arm: False}))
 
     print(f"ABLATION · {arm} on vs off · {args.seeds} paired seeds · {args.ticks} ticks\n")
     print(f"{'index':<18} {'on':>9} {'off':>9} {'delta':>9} {'cohen d':>9}")
@@ -70,7 +91,7 @@ def cmd_attribution(args):
     """Pool agents across seeds, then decompose lifespan (§7.2)."""
     pooled = {}
     for seed in range(args.seeds):
-        _, log = run(seed, args.ticks)
+        _, log = run(seed, args.ticks, scaled() if args.scale else None)
         for agent_id, prof in profiles.build(log).items():
             pooled[f"s{seed}:{agent_id}"] = prof
 
@@ -92,6 +113,30 @@ def cmd_attribution(args):
         print(f"    {k:<32} {why}")
 
 
+def cmd_worldgen(args):
+    """Generated worlds against flat ones, same seeds.
+
+    Scope limit, stated up front: at Tier 0 no agent ever reads a prompt, and
+    lore only reaches agents through the prompt. This measures terrain, node
+    siting and endowment — the procedural half of §4.1. It cannot measure
+    whether inherited history changes behaviour, which is §11's actual claim and
+    needs the LLM arm.
+    """
+    base = scaled if args.scale else (lambda extra=None: dict(extra or {}))
+    flat = collect(args.seeds, args.ticks, base({"worldgen": "flat"}))
+    gen = collect(args.seeds, args.ticks, base({"worldgen": "generated"}))
+
+    print(f"WORLDGEN · generated vs flat · {args.seeds} paired seeds · "
+          f"{args.ticks} ticks · Tier 0 only\n")
+    print(f"{'index':<22} {'flat':>10} {'generated':>10} {'delta':>10} {'cohen d':>9}")
+    for k in INDEX_KEYS:
+        a, b = gen[k], flat[k]
+        print(f"{k:<22} {stats.mean(b):>10.3f} {stats.mean(a):>10.3f} "
+              f"{stats.mean(a) - stats.mean(b):>10.3f} {stats.cohens_d(a, b):>9.2f}")
+    print("\n  Tier 0 agents never read a prompt, so no lore reached them.")
+    print("  This is the terrain/siting/endowment effect only.")
+
+
 def cmd_violence(args):
     """Pooled violence analysis. Norm compliance needs more defections than one
     seed produces, so the arms are pooled across seeds before the ratio."""
@@ -101,7 +146,7 @@ def cmd_violence(args):
     retaliations = violent_total = 0
 
     for seed in range(args.seeds):
-        _, log = run(seed, args.ticks)
+        _, log = run(seed, args.ticks, scaled() if args.scale else None)
         for r in log.records:
             if r["kind"] == "action" and r.get("opp", 0) >= 1:
                 violent = r["verb"] in indices.VIOLENT_VERBS
@@ -220,10 +265,13 @@ def main():
     sub = p.add_subparsers(dest="cmd", required=True)
     for name, fn in (("indices", cmd_indices), ("ablation", cmd_ablation),
                      ("attribution", cmd_attribution), ("violence", cmd_violence),
+                     ("worldgen", cmd_worldgen),
                      ("cognition", cmd_cognition), ("replay", cmd_replay)):
         sp = sub.add_parser(name)
         sp.add_argument("--seeds", type=int, default=20)
         sp.add_argument("--ticks", type=int, default=2000)
+        sp.add_argument("--scale", action="store_true",
+                        help="run at the 120-founder scale condition")
         if name == "ablation":
             sp.add_argument("--arm", default="deck")
         if name == "cognition":

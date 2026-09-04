@@ -1,0 +1,366 @@
+<title>Kestrel Basin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+
+<style>
+:root {
+  --bg: #EAEEEC; --surface: #F7FAF8; --surface-2: #E1E7E4;
+  --ink: #131B1A; --muted: #56655F; --faint: #83958E; --line: #C6D1CC;
+  --accent: #0F6E6B; --accent-soft: #D5E5E3; --on-accent: #F7FAF8;
+  --good: #3F7A56; --warn: #A8791A; --crit: #9E3B2E;
+  --d-survival: #C4553B; --d-mastery: #7A5FA6; --d-curiosity: #3E7CA8;
+  --t-water: #9DBCC4; --t-marsh: #A8B48C; --t-meadow: #BFCCA4;
+  --t-wood: #7E9A72; --t-stone: #B9BEB8;
+  --f-display: "Fraunces", Georgia, serif;
+  --f-ui: "IBM Plex Sans", system-ui, sans-serif;
+  --f-data: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0D1413; --surface: #141D1C; --surface-2: #1C2726;
+  --ink: #E3EAE7; --muted: #8CA09A; --faint: #63756F; --line: #2A3735;
+  --accent: #46A79F; --accent-soft: #1B3230; --on-accent: #0D1413;
+  --good: #63A87A; --warn: #C79A3C; --crit: #C4614F;
+  --d-survival: #DB7A61; --d-mastery: #A084CC; --d-curiosity: #5E9FCC;
+  --t-water: #24424A; --t-marsh: #3A4433; --t-meadow: #46533A;
+  --t-wood: #2E4230; --t-stone: #3B403A;
+} }
+:root[data-theme="dark"] {
+  --bg: #0D1413; --surface: #141D1C; --surface-2: #1C2726;
+  --ink: #E3EAE7; --muted: #8CA09A; --faint: #63756F; --line: #2A3735;
+  --accent: #46A79F; --accent-soft: #1B3230; --on-accent: #0D1413;
+  --good: #63A87A; --warn: #C79A3C; --crit: #C4614F;
+  --d-survival: #DB7A61; --d-mastery: #A084CC; --d-curiosity: #5E9FCC;
+  --t-water: #24424A; --t-marsh: #3A4433; --t-meadow: #46533A;
+  --t-wood: #2E4230; --t-stone: #3B403A;
+}
+
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--f-ui);
+       font-size: 14px; line-height: 1.55; -webkit-font-smoothing: antialiased; }
+button { font: inherit; color: inherit; cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.head { display: flex; align-items: baseline; gap: 18px; flex-wrap: wrap;
+        padding: 18px 22px 14px; border-bottom: 1px solid var(--line); }
+.head h1 { font-family: var(--f-display); font-size: 27px; font-weight: 600;
+           margin: 0; letter-spacing: -.015em; }
+.head .meta { font-family: var(--f-data); font-size: 11px; color: var(--muted);
+              letter-spacing: .03em; }
+.head .note { flex: 1 1 320px; font-size: 12.5px; color: var(--muted);
+              max-width: 62ch; }
+
+.shell { display: grid; grid-template-columns: minmax(320px, 1fr) minmax(400px, 1.05fr);
+         gap: 1px; background: var(--line); }
+.shell > section { background: var(--bg); min-width: 0; }
+
+.mapwrap { position: relative; }
+canvas { display: block; width: 100%; height: auto; }
+.mapfoot { display: flex; gap: 14px; flex-wrap: wrap; padding: 9px 22px 16px;
+           font-family: var(--f-data); font-size: 10.5px; color: var(--muted); }
+.mapfoot i { display: inline-block; width: 9px; height: 9px; margin-right: 5px; }
+
+.tabs { display: flex; gap: 2px; padding: 12px 22px 0; }
+.tab { background: none; border: 0; border-bottom: 2px solid transparent;
+       padding: 5px 10px 7px; font-family: var(--f-data); font-size: 11px;
+       letter-spacing: .09em; text-transform: uppercase; color: var(--muted); }
+.tab[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); }
+.panel { padding: 16px 22px 26px; }
+
+.chron article { padding-bottom: 18px; margin-bottom: 18px;
+                 border-bottom: 1px solid var(--line); }
+.chron article:last-child { border-bottom: 0; }
+.chron .when { font-family: var(--f-data); font-size: 10.5px; color: var(--faint);
+               letter-spacing: .05em; display: block; margin-bottom: 4px; }
+.chron p { font-family: var(--f-display); font-size: 16px; line-height: 1.6;
+           margin: 0; max-width: 60ch; text-wrap: pretty; }
+.chron .who { font-size: 11.5px; color: var(--muted); margin-top: 7px; }
+
+.who-pick { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 16px; }
+.who-pick button { background: var(--surface); border: 1px solid var(--line);
+                   border-radius: 3px; padding: 4px 10px; font-size: 12.5px; }
+.who-pick button[aria-pressed="true"] { background: var(--accent);
+                   border-color: var(--accent); color: var(--on-accent); }
+.agent h2 { font-family: var(--f-display); font-size: 22px; margin: 0 0 2px; }
+.agent .sub { font-family: var(--f-data); font-size: 11px; color: var(--muted);
+              margin-bottom: 14px; }
+.goal { font-family: var(--f-display); font-size: 16px; line-height: 1.45;
+        margin: 0 0 4px; max-width: 52ch; }
+.goal + .said { font-size: 11.5px; color: var(--faint); }
+.block { margin-top: 18px; }
+.block > h3 { font-family: var(--f-data); font-size: 10px; letter-spacing: .11em;
+              text-transform: uppercase; color: var(--muted); margin: 0 0 8px; }
+.drive { display: grid; grid-template-columns: 72px 1fr 38px; gap: 9px;
+         align-items: center; margin-bottom: 5px; }
+.drive .lb { font-family: var(--f-data); font-size: 10.5px; color: var(--muted); }
+.track { height: 7px; background: var(--surface-2); border-radius: 2px; overflow: hidden; }
+.track span { display: block; height: 100%; }
+.drive .nv { font-family: var(--f-data); font-size: 10.5px; text-align: right;
+             color: var(--muted); font-variant-numeric: tabular-nums; }
+.chips { display: flex; gap: 5px; flex-wrap: wrap; }
+.chip { font-family: var(--f-data); font-size: 10.5px; border: 1px solid var(--line);
+        border-radius: 999px; padding: 2px 9px; color: var(--muted); }
+.feed { list-style: none; margin: 0; padding: 0; display: grid; gap: 7px; }
+.feed li { display: grid; grid-template-columns: 52px 1fr; gap: 10px; font-size: 12.5px; }
+.feed .t { font-family: var(--f-data); font-size: 10.5px; color: var(--faint);
+           font-variant-numeric: tabular-nums; }
+
+.eras { list-style: none; margin: 0 0 4px; padding: 0; }
+.eras li { display: grid; grid-template-columns: 84px 1fr; gap: 12px;
+           padding: 7px 0; border-top: 1px solid var(--line); align-items: baseline; }
+.eras .yr { font-family: var(--f-data); font-size: 10.5px; color: var(--faint);
+            font-variant-numeric: tabular-nums; }
+.eras .nm { font-family: var(--f-display); font-size: 15px; }
+.facts { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.facts li { display: grid; grid-template-columns: 76px 1fr; gap: 10px; font-size: 12.5px; }
+.vis { font-family: var(--f-data); font-size: 9.5px; letter-spacing: .06em;
+       text-transform: uppercase; padding-top: 3px; }
+.vis.common { color: var(--good); } .vis.local { color: var(--muted); }
+.vis.specialist { color: var(--warn); } .vis.lost { color: var(--crit); }
+.myth { font-family: var(--f-display); font-style: italic; font-size: 14.5px;
+        line-height: 1.5; margin: 0 0 9px; max-width: 58ch; }
+
+.idx { display: grid; grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+       gap: 1px; background: var(--line); border: 1px solid var(--line); }
+.idx > div { background: var(--surface); padding: 9px 11px; }
+.idx .k { font-family: var(--f-data); font-size: 9.5px; letter-spacing: .07em;
+          text-transform: uppercase; color: var(--muted); display: block; }
+.idx .v { font-family: var(--f-data); font-size: 16px;
+          font-variant-numeric: tabular-nums; }
+.deaths { display: grid; gap: 4px; }
+.deathrow { display: grid; grid-template-columns: 76px 1fr 34px; gap: 9px;
+            align-items: center; font-family: var(--f-data); font-size: 11px; }
+.deathrow .bar { height: 8px; background: var(--crit); border-radius: 2px; }
+.caution { font-size: 12px; color: var(--muted); border-top: 1px dashed var(--line);
+           padding-top: 10px; margin-top: 16px; max-width: 60ch; }
+@media (max-width: 900px) { .shell { grid-template-columns: 1fr; } }
+</style>
+
+<header class="head">
+  <h1>Kestrel Basin</h1>
+  <span class="meta" id="meta"></span>
+  <p class="note">A world of agents with private goals, run without a model in the loop.
+    Everything below happened; nothing was authored.</p>
+</header>
+
+<div class="shell">
+  <section class="mapwrap">
+    <canvas id="map" width="960" height="640"></canvas>
+    <div class="mapfoot">
+      <span><i style="background:var(--t-water)"></i>water</span>
+      <span><i style="background:var(--t-meadow)"></i>grazing</span>
+      <span><i style="background:var(--t-wood)"></i>coppice</span>
+      <span><i style="background:var(--t-stone)"></i>scree</span>
+      <span><i style="background:var(--accent);border-radius:50%"></i>the living</span>
+      <span><i style="border:1px solid var(--muted)"></i>worked ground</span>
+      <span><i style="background:var(--crit);opacity:.55"></i>ruins</span>
+    </div>
+  </section>
+
+  <section>
+    <div class="tabs" role="tablist">
+      <button class="tab" role="tab" aria-selected="true" data-view="chron">Chronicle</button>
+      <button class="tab" role="tab" aria-selected="false" data-view="agent">Someone</button>
+      <button class="tab" role="tab" aria-selected="false" data-view="basin">The basin</button>
+      <button class="tab" role="tab" aria-selected="false" data-view="idx">Instruments</button>
+    </div>
+    <div class="panel" id="panel"></div>
+  </section>
+</div>
+
+<script>
+const W = /*__WORLD_DATA__*/null;
+const $ = (s) => document.querySelector(s);
+const css = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const esc = (s) => String(s).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+
+$("#meta").textContent =
+  `seed ${W.seed} · ${W.ticks.toLocaleString()} ticks · ${W.indices.population} alive · `
+  + `${W.narrative_summary.threads} threads scored from ${W.narrative_summary.events_scored.toLocaleString()} events`;
+
+// ---------------------------------------------------------------- map
+const cvs = $("#map"), ctx = cvs.getContext("2d");
+function drawMap() {
+  const rows = W.terrain.length, cols = W.terrain[0].length;
+  const dpr = window.devicePixelRatio || 1;
+  const w = cvs.clientWidth, h = Math.round(w * rows / cols);
+  cvs.width = w * dpr; cvs.height = h * dpr; cvs.style.height = h + "px";
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const tw = w / cols, th = h / rows;
+
+  for (let y = 0; y < rows; y++) for (let x = 0; x < cols; x++) {
+    ctx.fillStyle = css("--t-" + W.terrain[y][x]);
+    ctx.fillRect(Math.floor(x*tw), Math.floor(y*th), Math.ceil(tw)+1, Math.ceil(th)+1);
+  }
+  W.ruins.forEach(r => {
+    ctx.fillStyle = css("--crit"); ctx.globalAlpha = .5;
+    ctx.fillRect((r.x+.25)*tw, (r.y+.25)*th, tw*.5, th*.5); ctx.globalAlpha = 1;
+  });
+  W.nodes.forEach(n => {
+    const cx = (n.x+.5)*tw, cy = (n.y+.5)*th, r = Math.min(tw,th)*.42;
+    ctx.beginPath(); ctx.moveTo(cx, cy-r); ctx.lineTo(cx+r, cy);
+    ctx.lineTo(cx, cy+r); ctx.lineTo(cx-r, cy); ctx.closePath();
+    ctx.fillStyle = css("--surface"); ctx.globalAlpha = .35 + n.stock*.5; ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = n.degradation > .4 ? css("--crit") : css("--muted");
+    ctx.lineWidth = 1; ctx.stroke();
+  });
+  W.agents.forEach(a => {
+    const cx = (a.x+.5)*tw, cy = (a.y+.5)*th;
+    if (a.id === selected) {
+      ctx.beginPath(); ctx.arc(cx, cy, 12, 0, 7); ctx.strokeStyle = css("--accent");
+      ctx.lineWidth = 1.8; ctx.stroke();
+    }
+    ctx.beginPath(); ctx.arc(cx, cy, 5.5, 0, 7);
+    ctx.fillStyle = css("--accent"); ctx.fill();
+    ctx.strokeStyle = css("--surface"); ctx.lineWidth = 1.8; ctx.stroke();
+  });
+}
+
+// ---------------------------------------------------------------- panels
+let selected = W.agents[0].id, view = "chron";
+
+const views = {
+  chron: () => `<div class="chron">` + W.chronicle.map(c => `
+      <article>
+        <span class="when">tick ${c.from.toLocaleString()}–${c.to.toLocaleString()}</span>
+        <p>${esc(c.text)}</p>
+        <div class="who">${esc(c.who.slice(0,5).join(", "))}${c.who.length>5?" and others":""}</div>
+      </article>`).join("") + `</div>`,
+
+  agent: () => {
+    const a = W.agents.find(x => x.id === selected) || W.agents[0];
+    const goalText = {
+      accumulate: `put by ${a.goal.threshold} food against hard times`,
+      master: `learn ${a.goal.threshold} different crafts`,
+      teach: `pass what they know to ${a.goal.threshold} people`,
+      bond: `bind themselves to ${a.goal.threshold} people`,
+      lineage: `have ${a.goal.threshold} children`,
+      outlive: `live to see ${a.goal.threshold}`,
+      provide: `give to others ${a.goal.threshold} times`,
+      avenge: `settle what was done to them`,
+    }[a.goal && a.goal.kind] || "nothing in particular";
+    return `
+      <div class="who-pick">${W.agents.map(x =>
+        `<button data-who="${x.id}" aria-pressed="${x.id===a.id}">${esc(x.name)}</button>`).join("")}</div>
+      <div class="agent">
+        <h2>${esc(a.name)}</h2>
+        <div class="sub">generation ${a.generation} · aged ${a.age.toLocaleString()} ·
+          ${a.goals_met} of ${a.goals_held} past goals met</div>
+        <p class="goal">They have set themselves to ${esc(goalText)}.</p>
+        <div class="said">Nobody else knows this.</div>
+
+        <div class="block"><h3>What pulls at them</h3>
+          ${Object.entries(a.drives).map(([k,v]) => `
+            <div class="drive"><span class="lb">${k}</span>
+              <span class="track"><span style="width:${v*100}%;background:var(--d-${k})"></span></span>
+              <span class="nv">${v.toFixed(2)}</span></div>`).join("")}
+          <div class="drive"><span class="lb">restraint</span>
+            <span class="track"><span style="width:${a.restraint*100}%;background:var(--muted)"></span></span>
+            <span class="nv">${a.restraint.toFixed(2)}</span></div>
+        </div>
+
+        <div class="block"><h3>What they can do</h3>
+          <div class="chips">${a.techniques.length
+            ? a.techniques.map(t => `<span class="chip">${t}</span>`).join("")
+            : `<span class="chip">nothing yet</span>`}</div></div>
+
+        ${a.beliefs.length ? `<div class="block"><h3>What they hold to be true</h3>
+          <div class="chips">${a.beliefs.map(b =>
+            `<span class="chip">${b.about.slice(-3)} is ${b.claim.replace("_"," ")}</span>`).join("")}</div>
+          </div>` : ""}
+
+        <div class="block"><h3>What they know happened</h3>
+          <ul class="feed">${a.feed.map(f =>
+            `<li><span class="t">t${f.tick}</span><span>${esc(f.text)}</span></li>`).join("")}</ul>
+          <p class="caution">Only what they were party to. They do not know the rest.</p>
+        </div>
+      </div>`;
+  },
+
+  basin: () => {
+    const h = W.history;
+    return `
+      <div class="block" style="margin-top:0"><h3>How the basin got here</h3>
+        <ul class="eras">${h.eras.map(e =>
+          `<li><span class="yr">yr ${e.from}–${e.to}</span><span class="nm">${esc(e.name)}</span></li>`).join("")}</ul>
+      </div>
+      <div class="block"><h3>What is remembered, and how well</h3>
+        <ul class="facts">${h.facts.slice(0,9).map(f =>
+          `<li><span class="vis ${f.visibility}">${f.visibility}</span><span>${esc(f.claim)}</span></li>`).join("")}</ul>
+        <p class="caution">Common knowledge reaches everyone. Local knowledge stays where it
+          happened. Lost facts reach nobody — recovering one is worth doing.</p>
+      </div>
+      <div class="block"><h3>What people say instead</h3>
+        ${h.myths.slice(0,4).map(m => `<p class="myth">${esc(m.as_told)}</p>`).join("")}
+        <p class="caution">${Math.round(h.divergence*100)}% of remembered facts have been bent
+          by a story. Agents are told myth and history side by side, unlabelled — they have no
+          way to tell which is which.</p>
+      </div>
+      <div class="block"><h3>How things are done here</h3>
+        <div class="chips">
+          ${h.culture.taboos.map(t => `<span class="chip">${esc(t)}</span>`).join("")}
+          <span class="chip">they eat ${esc(h.culture.staple)}</span>
+          ${h.institutions.filter(i=>i.active).map(i =>
+            `<span class="chip">${i.kind} at ${esc(i.seat)}</span>`).join("")}
+        </div></div>`;
+  },
+
+  idx: () => {
+    const labels = {
+      population:"population", material_output_total:"output, total",
+      material_output:"output per head", knowledge_depth:"knowledge depth",
+      knowledge_breadth:"knowledge breadth", institution_density:"institutions",
+      reciprocity:"reciprocity", goal_attainment:"goals met, lifetime",
+      goal_progress:"goal progress now", inequality:"inequality (gini)",
+      drive_diversity:"drive diversity", life_expectancy:"life expectancy",
+      violence_rate:"violence /1k acts", mean_restraint:"mean restraint",
+      norm_compliance:"norm compliance",
+    };
+    const curve = W.population_curve;
+    const maxPop = Math.max(...curve.map(p => p.population), 1);
+    const pts = curve.map((p,i) =>
+      `${(i/(curve.length-1)*300).toFixed(1)},${(46 - p.population/maxPop*40).toFixed(1)}`).join(" ");
+    const totalDeaths = Object.values(W.deaths).reduce((a,b)=>a+b,0) || 1;
+    return `
+      <div class="block" style="margin-top:0"><h3>Population over the run</h3>
+        <svg viewBox="0 0 300 52" width="100%" height="60" role="img"
+             aria-label="population over time, peak ${maxPop}">
+          <polyline points="${pts}" fill="none" stroke="var(--accent)" stroke-width="1.6"/>
+          <text x="0" y="10" font-size="8" fill="var(--muted)"
+                font-family="IBM Plex Mono, monospace">peak ${maxPop}</text>
+          <text x="264" y="50" font-size="8" fill="var(--muted)"
+                font-family="IBM Plex Mono, monospace">t${W.ticks}</text>
+        </svg></div>
+      <div class="block"><h3>The ten indices, reported together</h3>
+        <div class="idx">${Object.entries(W.indices).map(([k,v]) =>
+          `<div><span class="k">${labels[k]||k}</span><span class="v">${
+            typeof v === "number" ? (Math.abs(v)>=100 ? v.toFixed(0) : v.toFixed(2)) : v
+          }</span></div>`).join("")}</div>
+        <p class="caution">Never collapsed into one score. A world can rise in output while
+          losing diversity, and that tradeoff is the finding.</p></div>
+      <div class="block"><h3>What killed them</h3>
+        <div class="deaths">${Object.entries(W.deaths).sort((a,b)=>b[1]-a[1]).map(([k,v]) =>
+          `<div class="deathrow"><span>${k}</span>
+            <span class="bar" style="width:${v/totalDeaths*100}%"></span>
+            <span style="text-align:right">${v}</span></div>`).join("")}</div>
+        <p class="caution">Starvation is the economy failing. Fever and injury come from the
+          event deck, and fall on anyone. Killings are agents choosing.</p></div>`;
+  },
+};
+
+function render() {
+  $("#panel").innerHTML = views[view]();
+  document.querySelectorAll("[data-who]").forEach(b =>
+    b.addEventListener("click", () => { selected = b.dataset.who; render(); drawMap(); }));
+}
+document.querySelectorAll(".tab").forEach(t => t.addEventListener("click", () => {
+  document.querySelectorAll(".tab").forEach(x =>
+    x.setAttribute("aria-selected", String(x === t)));
+  view = t.dataset.view; render();
+}));
+window.addEventListener("resize", drawMap);
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", drawMap);
+render();
+requestAnimationFrame(drawMap);
+</script>

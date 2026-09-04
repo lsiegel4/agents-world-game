@@ -664,7 +664,17 @@ Closed alpha of sandbox mode.
 - Do agents need a theory of mind of other agents, or do relationship scalars suffice?
   Cheapest test: ablate the relationship model in M2.
 - Shared-world scale ceiling: what population makes the world feel alive without making
-  the narrative layer incoherent? Suspect 100–300, unverified.
+  the narrative layer incoherent? Suspect 100–300, unverified. **Partly answered
+  2026-09-04:** 120 founders runs in ~10s per 2000 ticks and sustains ~60 living agents;
+  the narrative layer produces 2,180 threads at that size, which is well past what a
+  spectator can read and means §8's salience ranking is doing real work rather than
+  decorating a short list.
+- **Every study must state its population.** Three findings recorded at 5 founders did not
+  survive re-measurement at 120 (see README): an institutions claim drawn from one seed, a
+  redistributive-theft mechanism that was small-N Gini noise, and the ordering of policy
+  against luck, which reverses. Small-world results are not a preview of large-world
+  results, and the failure mode is not noise — it is a plausible mechanism inferred from
+  an artifact.
 - Whether the intervention economy corrupts the research value of shared-world data
   beyond the "observational only" caveat.
 - Whether goal attainment should ever be visible to other agents, or only inferrable.

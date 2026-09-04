@@ -19,7 +19,13 @@ from .state import (
 
 BASELINE_DRIVES = {"survival": 0.45, "mastery": 0.35, "curiosity": 0.35}
 
-NAMES = ["Maren", "Rhoswen", "Doran", "Ilka", "Bastian", "Sela", "Cael", "Wick"]
+# A child took the parent's name plus "sson" every generation, so within a few
+# hundred ticks every living agent was called "Ilkasson" and a chronicle read as
+# one person doing everything. Children now take a given name of their own.
+NAMES = ["Maren", "Rhoswen", "Doran", "Ilka", "Bastian", "Sela", "Cael", "Wick",
+         "Alder", "Bryn", "Corvin", "Dela", "Enna", "Fenn", "Gethin", "Hesper",
+         "Idris", "Juna", "Kestrel", "Lorne", "Mabon", "Nesta", "Orin", "Pell",
+         "Quillon", "Rowan", "Saskia", "Torin", "Ulla", "Veryan", "Wren", "Ysolde"]
 
 
 def make_world(seed: int, config: dict) -> World:
