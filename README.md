@@ -3,9 +3,9 @@
 Headless simulation of a world of agents with private, heterogeneous goals.
 Design: [DESIGN.md](DESIGN.md). Spectator mockup: `mockup/spectator.html`.
 
-**Status: M0 and M2 complete.** M1 slice 1 (cognition machinery) and slice 2 (social
-verbs) built; one live recording run done for $0.41. Nine of the ten §7.1 indices now
-compute — only `goal_attainment` is outstanding.
+**Status: M0, M1 and M2 complete.** One live recording run done for $0.41. **All ten
+§7.1 indices and all ten §7.3 behavioural-profile fields now compute** — both
+`UNAVAILABLE` maps are empty.
 Every agent runs on utility AI over its drive vector — this is the permanent non-LLM
 control arm from §7.5, not a placeholder to be replaced. M1 (cognition) has not
 started.
@@ -37,6 +37,7 @@ No dependencies. Python 3.9+.
 | `world/actions.py` | `move` `work` `eat` `repair` (of the 12 in §5.5) |
 | `world/deck.py` | Event deck — state-weighted draws, mixed valence, non-starvation death |
 | `world/knowledge.py` | Technique graph, discovery, transmission (§7.1 depth/breadth) |
+| `world/goals.py` | Private goals: generation, evaluation, revision, inheritance (§5.3) |
 | `world/memory.py` | Episodic memory: salience, decay, ranked recall (§5.4) |
 | `world/prompt.py` | State -> prompt rendering and the API tool schema (§5.2) |
 | `world/cognition.py` | Stakes scoring, tier routing, model-driven action choice (§5.7) |
@@ -476,3 +477,45 @@ prompt tokens once rendered. Fixed. And `oldest agent: 1239 ticks` surfaced a re
 §4.3 says agents age and die, but **no mortality is attached to age at all**. A third
 generation sharing the world with its founders is not a succession, which matters for the
 §7.6 lock-in test. Logged in §12 next to the archetype work.
+
+
+## M1 slice 3 — private goals
+
+Every agent carries a private goal drawn from a generator weighted by its current drives.
+Eight kinds — `accumulate`, `master`, `teach`, `bond`, `lineage`, `outlive`, `provide`,
+`avenge`. Goals are **structured, not free text**, so `goal_attainment` is computed from
+engine state with no model in the loop (§7.5 threat #5).
+
+Goals are private in the strong sense: an agent's goal is rendered only into its own
+prompt, never into anyone else's observation. A test plants a token in one agent's goal
+and asserts it cannot appear in another's prompt.
+
+**Revision** happens at the three §5.3 thresholds — achieved, proven impossible, or a
+life event — and the old goal is kept in `goal_history`. Nothing asks the agent to change
+its mind: the engine restates the goal and the next prompt renders from the new state.
+Measured across 12 seeds x 3000 ticks, agents that revise at all hold **6.13 goals over a
+lifetime**, and 42.6% of all goals ever held were met.
+
+**Inheritance** gives children the *shape* of the parent's goal, not its progress —
+§5.3's goal-acquisition case, and what §7.6's lock-in test will eventually read.
+
+Goals bias behaviour through a modest `GOAL_PULL` on the matching verb. Deliberately
+modest: a goal should bias a life, not override hunger.
+
+### Two measurement traps in one slice
+
+**Attainment measured on a snapshot reads ~0 in a world where goals are met constantly.**
+A goal is revised the instant it is reached, so almost nobody is ever caught at 100%. The
+first implementation reported `goal_attainment 0.0` alongside `goal_progress 0.33`; it was
+measuring the revision rule, not attainment. It now reads the lifetime record: 0.426.
+
+**Adding a PRNG draw to the shared stream silently re-randomises every world.** Goal
+generation initially drew from the decision RNG, so every seed produced a different world
+and extinction appeared to rise from 1/20 to 4/20. Nothing had got worse — the comparison
+was simply not paired. Goals now have their own stream (`seed ^ 0x6041`), matching the
+deck's. Properly paired, goals *improved* viability: **mean population 9.80 -> 13.50,
+extinctions 1/20 -> 0/20**, via the reinforcement from meeting one.
+
+That is the second time separate PRNG streams have earned their keep, and the rule is
+worth stating plainly: **any new source of randomness gets its own stream, or every
+prior result silently becomes incomparable.**

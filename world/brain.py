@@ -7,6 +7,9 @@ with a small seeded jitter to break ties without breaking determinism.
 """
 
 from . import knowledge
+
+GOAL_VERB = {"teach": "teach", "provide": "give", "lineage": "reproduce",
+             "bond": "form_bond", "master": "work", "accumulate": "work"}
 from .state import (
     FOOD,
     INTERACT_RADIUS,
@@ -42,6 +45,11 @@ MESSAGE_URGE = 0.12
 COERCE_URGE = 1.00
 SURPLUS_FOOD = 7.0        # above this an agent has something to spare
 STANDING_FULL = 3.0
+
+# How much an agent's own goal tilts its choice. Modest on purpose: a goal
+# should bias a life, not override hunger. §5.3 wants goals malleable and
+# influenceable by circumstance, not dominant over it.
+GOAL_PULL = 0.30
 
 JITTER = 0.04
 COMFORTABLE_FOOD = 6.0   # food stock at which the survival motive is satisfied
@@ -175,7 +183,19 @@ def candidates(world: World, agent: Agent, witness_count: int = 0,
                                 "coerce", {"target_id": other.id}))
 
     out.append((0.05, "idle", {}))
-    return [c for c in out if c[1] not in disabled]
+    out = [c for c in out if c[1] not in disabled]
+
+    # Goals move behaviour, or they are decoration on a state dict.
+    goal_verb = GOAL_VERB.get(agent.goal.get("kind"))
+    if goal_verb:
+        out = [(u + GOAL_PULL if verb == goal_verb else u, verb, params)
+               for u, verb, params in out]
+    if agent.goal.get("kind") == "avenge":
+        target = agent.goal.get("target")
+        out = [(u + GOAL_PULL if verb in ("harm", "coerce")
+                and params.get("target_id") == target else u, verb, params)
+               for u, verb, params in out]
+    return out
 
 
 def choose(world: World, agent: Agent, rng, witness_count: int = 0,

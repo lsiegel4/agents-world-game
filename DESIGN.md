@@ -604,7 +604,13 @@ only, no LLM. Proved the economy produces non-degenerate outcomes; the §4.5 eve
 was pulled forward into this milestone. Permanent non-LLM control arm. Findings, and the
 reasons the M0 gate was retired rather than patched, are in README.md.
 
-**M1 — Cognition. ◐ Slices 1 and 2 built 2026-09-04.** Slice 2 added the social verbs
+**M1 — Cognition. ✅ Complete 2026-09-04.** Slice 3 added private goals with revision
+and inheritance, closing the last of §7.1 and §7.3 — every index and every behavioural
+profile field is now computable from engine state, with no model in the measurement loop.
+Outstanding for later: LLM memory consolidation into semantic beliefs, and a live run at
+scale.
+
+*Slices 1 and 2.* Slice 2 added the social verbs
 (`give`, `teach`, `form_bond`, `speak`, `leave_message`, `coerce`) and a technique graph,
 closing all of §7.1 except `goal_attainment`. The `teach` ablation is the first real
 answer to question 1: teaching nearly doubles population and triples knowledge depth.

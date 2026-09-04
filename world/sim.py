@@ -6,7 +6,7 @@ randomness; agents are always processed in list order.
 
 import random
 
-from . import actions, deck, indices, knowledge
+from . import actions, deck, goals, indices, knowledge
 from .memory import Memory
 from .genesis import BASELINE_DRIVES, make_world
 from .log import EventLog
@@ -108,6 +108,49 @@ def apply(world: World, agent, verb: str, params: dict, rng, log, w: int = 0, op
         actions.idle(world, agent, log, w, opp)
 
 
+def tally(agent, verb: str, params: dict) -> None:
+    if verb == "teach":
+        agent.counters["teach"] = agent.counters.get("teach", 0) + 1
+    elif verb == "give":
+        agent.counters["provide"] = agent.counters.get("provide", 0) + 1
+    elif verb == "reproduce":
+        agent.counters["lineage"] = agent.counters.get("lineage", 0) + 1
+    elif verb in ("harm", "coerce"):
+        goal = agent.goal
+        if goal.get("kind") == "avenge" and params.get("target_id") == goal.get("target"):
+            agent.counters["avenged"] = agent.counters.get("avenged", 0) + 1
+
+
+def review_goal(world: World, agent, rng, log) -> None:
+    """§5.3's three levers, engine-side.
+
+    Revision happens at thresholds — achieved, proven impossible, or a major
+    life event — and the old goal is retained in history. Nothing here asks the
+    agent to change its mind; the engine restates the goal and the next prompt
+    is rendered from the new state.
+    """
+    goal = agent.goal
+    if not goal:
+        return
+
+    done = goals.progress(agent, goal, agent.counters) >= 1.0
+    dead_end = goals.impossible(agent, goal, world)
+    if not (done or dead_end):
+        return
+
+    goal["met"] = done
+    goal["ended"] = world.tick
+    agent.goal_history.append(dict(goal))
+    if done:
+        # Reaching something you set out to do is its own reinforcement.
+        agent.drives["mastery"] = min(0.99, agent.drives["mastery"] + 0.04)
+
+    agent.goal = goals.generate(agent, rng, world)
+    log.emit(world.tick, "goal", agent=agent.id, previous=goal["kind"],
+             outcome="met" if done else "abandoned",
+             new=agent.goal["kind"], held_for=world.tick - goal.get("since", 0))
+
+
 def surroundings(world: World, agent) -> tuple:
     """(witnesses within sight, agents within reach) for this agent, right now."""
     w = opp = 0
@@ -136,7 +179,8 @@ def update_restraint(agent) -> None:
             del agent.grudges[other_id]
 
 
-def step(world: World, rng, log, deck_rng=None, cfg=None, mind=None) -> None:
+def step(world: World, rng, log, deck_rng=None, cfg=None, mind=None,
+         goal_rng=None) -> None:
     from . import brain
     world.tick += 1
 
@@ -163,6 +207,8 @@ def step(world: World, rng, log, deck_rng=None, cfg=None, mind=None) -> None:
         if verb in disabled:
             verb, params = "idle", {}
         apply(world, agent, verb, params, rng, log, w, opp)
+        tally(agent, verb, params)
+        review_goal(world, agent, goal_rng or rng, log)
         update_drives(agent, verb)
         update_restraint(agent)
         agent.memory.decay(world.tick)
@@ -229,6 +275,7 @@ def run(seed: int, ticks: int, config: dict = None, mind=None):
         log.emit(0, "spawn", agent=agent.id, generation=0, restraint=agent.restraint,
                  x=agent.x, y=agent.y, age=agent.age,
                  food=agent.has("food"), drives=dict(agent.drives),
+                 goal=agent.goal.get("kind", ""),
                  # Distance to the nearest node of each kind is the spatial half
                  # of endowment, and M0 showed it dominates survival.
                  d_food=min((max(abs(n.x - agent.x), abs(n.y - agent.y))
@@ -240,9 +287,13 @@ def run(seed: int, ticks: int, config: dict = None, mind=None):
     # in every agent's decision and vice versa. Ablations stay comparable.
     rng = random.Random(seed ^ 0x5EED)
     deck_rng = random.Random(seed ^ 0xDECC)
+    goal_rng = random.Random(seed ^ 0x6041)
+
+    for agent in world.agents:
+        agent.goal = goals.generate(agent, goal_rng, world)
 
     for _ in range(ticks):
-        step(world, rng, log, deck_rng, cfg, mind)
+        step(world, rng, log, deck_rng, cfg, mind, goal_rng)
         if not world.living_agents():
             log.emit(world.tick, "extinction")
             break

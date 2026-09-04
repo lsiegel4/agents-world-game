@@ -6,7 +6,7 @@ repair is the smallest set that produces a non-degenerate economy — two
 non-fungible resources at different places, both of them needed.
 """
 
-from . import knowledge
+from . import goals, knowledge
 from .state import (
     BOND_RADIUS,
     COERCE_TAKE,
@@ -157,6 +157,8 @@ def reproduce(world: World, agent: Agent, rng, log, witness_count: int = 0, opp:
                                + rng.uniform(-RESTRAINT_INHERIT_NOISE,
                                              RESTRAINT_INHERIT_NOISE))),
         restraint_base=agent.restraint_base,
+        # Uses no randomness, so it cannot perturb the decision stream.
+        goal=goals.inherit(agent.goal, None, world) if agent.goal else {},
         parent=agent.id,
         generation=agent.generation + 1,
         last_birth=world.tick,
@@ -194,7 +196,8 @@ def steal(world: World, agent: Agent, target_id: str, log, witness_count: int = 
     _remember(victim, world.tick, f"{agent.id} took food from you", 4.0, ("wronged",))
     _remember(agent, world.tick, f"you took food from {victim.id}", 2.5, ("did",))
     log.emit(world.tick, "action", agent=agent.id, verb="steal",
-             target=target_id, taken=round(taken, 2),
+             betrayal=target_id in agent.bonds, target=target_id,
+             taken=round(taken, 2),
              witnesses=len(seen), observed=bool(seen),
              restraint=round(agent.restraint, 3), w=witness_count, opp=opp)
     return True
@@ -223,6 +226,7 @@ def harm(world: World, agent: Agent, target_id: str, rng, log, witness_count: in
 
     killed = rng.random() < HARM_DEATH_P
     log.emit(world.tick, "action", agent=agent.id, verb="harm",
+             betrayal=target_id in agent.bonds,
              target=target_id, killed=killed,
              witnesses=len(seen), observed=bool(seen),
              restraint=round(agent.restraint, 3), w=witness_count, opp=opp)

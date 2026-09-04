@@ -57,7 +57,8 @@ class TestIndices(unittest.TestCase):
         self.assertEqual(set(vec), {
             "population", "material_output", "material_output_total",
             "knowledge_depth", "knowledge_breadth", "institution_density",
-            "reciprocity", "inequality", "drive_diversity", "life_expectancy",
+            "reciprocity", "goal_attainment", "goal_progress",
+            "inequality", "drive_diversity", "life_expectancy",
             "violence_rate", "mean_restraint", "norm_compliance"})
         self.assertGreaterEqual(vec["inequality"], 0.0)
         self.assertLessEqual(vec["inequality"], 1.0)
@@ -65,11 +66,15 @@ class TestIndices(unittest.TestCase):
         self.assertLessEqual(vec["drive_diversity"], 1.0)
 
     def test_unmeasurable_indices_are_declared_not_faked(self):
+        """Anything declared unavailable must never appear in the vector. As of
+        M1 slice 3 the §7.1 vector is fully measurable and both UNAVAILABLE maps
+        are empty — the invariant still has to hold if either refills."""
         for key in indices.UNAVAILABLE:
             self.assertNotIn(key, indices.vector(*run(1, 200)))
-        # goal_attainment is the last one outstanding; everything else in the
-        # §7.1 vector became measurable when the social verbs landed.
-        self.assertIn("goal_attainment", indices.UNAVAILABLE)
+        for key in profiles.UNAVAILABLE:
+            _, log = run(1, 400)
+            for prof in profiles.build(log).values():
+                self.assertNotIn(key, prof)
 
 
 class TestKnowledge(unittest.TestCase):
@@ -124,6 +129,65 @@ class TestKnowledge(unittest.TestCase):
         # members, so a single seed can legitimately end with none. Across
         # seeds, some must survive.
         self.assertGreater(institutions, 0)
+
+
+class TestGoals(unittest.TestCase):
+    def test_every_agent_has_a_private_goal(self):
+        world, _ = run(5, 1500)
+        for agent in world.living_agents():
+            self.assertTrue(agent.goal)
+            self.assertIn(agent.goal["kind"], __import__(
+                "world.goals", fromlist=["KINDS"]).KINDS)
+
+    def test_goals_are_heterogeneous(self):
+        """§2.1: no global objective. If every agent draws the same goal, the
+        world has one in practice however the doc is worded."""
+        world, _ = run(5, 1500)
+        kinds = {a.goal["kind"] for a in world.living_agents() if a.goal}
+        self.assertGreater(len(kinds), 1)
+
+    def test_revision_retains_history(self):
+        world, log = run(5, 2500)
+        revisions = [r for r in log.records if r["kind"] == "goal"]
+        self.assertTrue(revisions)
+        holders = [a for a in world.agents if a.goal_history]
+        self.assertTrue(holders)
+        for past in holders[0].goal_history:
+            self.assertIn("ended", past)
+
+    def test_impossible_goals_are_abandoned_not_held(self):
+        _, log = run(5, 2500)
+        outcomes = {r["outcome"] for r in log.records if r["kind"] == "goal"}
+        self.assertIn("abandoned", outcomes)
+
+    def test_attainment_is_measured_over_history_not_snapshot(self):
+        """A goal is revised the moment it is met, so a snapshot of the living
+        reports ~0 however well the population is doing."""
+        world, log = run(5, 3000)
+        self.assertGreater(indices.goal_attainment(world), 0.0)
+
+    def test_children_inherit_goal_shape_not_progress(self):
+        world, _ = run(5, 2500)
+        by_id = {a.id: a for a in world.agents}
+        checked = 0
+        for agent in world.agents:
+            parent = by_id.get(agent.parent)
+            if parent is None or not agent.goal:
+                continue
+            if agent.goal.get("acquired") == "inherited":
+                self.assertFalse(agent.goal["met"])
+                checked += 1
+        self.assertGreater(checked, 0)
+
+    def test_goals_do_not_leak_into_another_agents_prompt(self):
+        from world import prompt
+        world, _ = run(5, 1500)
+        live = world.living_agents()
+        me, other = live[0], live[1]
+        other.goal = {"kind": "avenge", "target": "LEAK_TOKEN",
+                      "threshold": 1.0, "met": False}
+        rendered = prompt.render(world, me, [other], [(world.nodes[0], 1)])
+        self.assertNotIn("LEAK_TOKEN", rendered["system"] + rendered["user"])
 
 
 class TestViolence(unittest.TestCase):

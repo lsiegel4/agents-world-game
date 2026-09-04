@@ -10,12 +10,10 @@ than silently omitted or faked with a proxy — a proxy would let a result be
 reported for an index the simulation cannot actually measure.
 """
 
-from . import knowledge, stats
+from . import goals, knowledge, stats
 from .state import FOOD, WOOD, World
 
-UNAVAILABLE = {
-    "goal_attainment": "agents have drives but no private goals until M1 slice 3",
-}
+UNAVAILABLE = {}   # §7.1's vector is fully measurable as of M1 slice 3
 
 VIOLENT_VERBS = ("steal", "harm")
 
@@ -175,6 +173,44 @@ def trust_network(world: World) -> dict:
             "reciprocity": round(mutual / ties, 4) if ties else 0.0}
 
 
+def goal_attainment(world: World) -> float:
+    """Fraction of all goals ever held that were met.
+
+    Measured over history, not over a snapshot of the living. A goal is revised
+    the moment it is reached (§5.3), so an instantaneous reading catches almost
+    nobody at 100% and reports ~0 in a world where goals are being met
+    constantly — the metric would be measuring the revision rule, not attainment.
+
+    Computed from engine state with no model in the loop (§7.5 threat #5), which
+    is why goals are structured rather than free text.
+    """
+    met = held = 0
+    for agent in world.agents:
+        for past in agent.goal_history:
+            held += 1
+            met += bool(past.get("met"))
+        if agent.goal:
+            held += 1
+            met += goals.progress(agent, agent.goal, agent.counters) >= 1.0
+    return met / held if held else 0.0
+
+
+def goal_progress(world: World) -> float:
+    """Mean partial progress — the same population, less all-or-nothing."""
+    live = world.living_agents()
+    scored = [goals.progress(a, a.goal, a.counters) for a in live if a.goal]
+    return stats.mean(scored) if scored else 0.0
+
+
+def goals_revised(log) -> float:
+    """Mean goals abandoned per agent that revised at all — §5.3's drift."""
+    per_agent = {}
+    for r in log.records:
+        if r["kind"] == "goal":
+            per_agent[r["agent"]] = per_agent.get(r["agent"], 0) + 1
+    return stats.mean(list(per_agent.values())) if per_agent else 0.0
+
+
 def vector(world: World, log) -> dict:
     """The measurable slice of §7.1. Report it whole — a world can rise in
     material output while collapsing in diversity, and that tradeoff is the
@@ -187,6 +223,8 @@ def vector(world: World, log) -> dict:
         "knowledge_breadth": round(knowledge_breadth(world), 3),
         "institution_density": institution_density(world),
         "reciprocity": trust_network(world)["reciprocity"],
+        "goal_attainment": round(goal_attainment(world), 4),
+        "goal_progress": round(goal_progress(world), 4),
         "inequality": round(inequality(world), 4),
         "drive_diversity": round(drive_diversity(world), 4),
         "life_expectancy": round(life_expectancy(log), 1),

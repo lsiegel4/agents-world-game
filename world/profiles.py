@@ -15,9 +15,7 @@ need M1's social verbs are listed in UNAVAILABLE rather than approximated.
 
 from . import stats
 
-UNAVAILABLE = {
-    "commitment_keeping_rate": "needs commitments, which arrive with goals (slice 3)",
-}
+UNAVAILABLE = {}   # §7.3's behavioural profile is fully populated as of slice 3
 
 
 POLICY_WINDOW = 100   # actions
@@ -49,6 +47,9 @@ def build(log, policy_window: int = POLICY_WINDOW) -> dict:
                 "restraint_at_t0": r.get("restraint", 0.0),
                 "victimized": 0,
                 "retaliations": 0,
+                "betrayals": 0,
+                "goals_held": 0,
+                "goals_met": 0,
                 "wronged_by": set(),
                 "verbs": {},
                 "early": {},
@@ -73,6 +74,11 @@ def build(log, policy_window: int = POLICY_WINDOW) -> dict:
                     # Retaliation: harming someone who wronged you first.
                     if r.get("target") in a["wronged_by"]:
                         a["retaliations"] += 1
+                    # A bond is the smallest commitment in the world: bonded
+                    # agents are not supposed to prey on each other. Breaking
+                    # that is the only defection the engine can currently see.
+                    if r.get("betrayal"):
+                        a["betrayals"] += 1
                 a["verbs"][r["verb"]] = a["verbs"].get(r["verb"], 0) + 1
                 if a["n_early"] < policy_window:
                     a["early"][r["verb"]] = a["early"].get(r["verb"], 0) + 1
@@ -88,6 +94,12 @@ def build(log, policy_window: int = POLICY_WINDOW) -> dict:
                     a["helped"] += 1
                 else:
                     a["harmed"] += 1
+
+        elif kind == "goal":
+            a = agents.get(r["agent"])
+            if a is not None:
+                a["goals_held"] += 1
+                a["goals_met"] += (r.get("outcome") == "met")
 
         elif kind == "death":
             a = agents.get(r["agent"])
@@ -112,6 +124,8 @@ def build(log, policy_window: int = POLICY_WINDOW) -> dict:
         a["theft_rate"] = a["verbs"].get("steal", 0) / total
         a["harm_rate"] = a["verbs"].get("harm", 0) / total
         a["retaliation_rate"] = a["retaliations"] / violent if violent else 0.0
+        a["commitment_keeping_rate"] = (
+            1.0 - a["betrayals"] / violent if violent else 1.0)
         a["wronged_by"] = len(a["wronged_by"])
         for verb in ("work", "move", "eat", "repair", "reproduce", "idle"):
             a[f"{verb}_share"] = a["early"].get(verb, 0) / early_total

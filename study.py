@@ -20,8 +20,12 @@ from world import cognition, indices, profiles, stats
 from world.llm import ModelClient
 from world.sim import run
 
-INDEX_KEYS = ["population", "material_output", "inequality",
-              "drive_diversity", "life_expectancy",
+# The full §7.1 vector. Kept in one place so every command reports the same
+# thing — a study that quietly drops indices is how a tradeoff gets hidden.
+INDEX_KEYS = ["population", "material_output", "material_output_total",
+              "knowledge_depth", "knowledge_breadth", "institution_density",
+              "reciprocity", "goal_attainment", "goal_progress",
+              "inequality", "drive_diversity", "life_expectancy",
               "violence_rate", "mean_restraint"]
 
 

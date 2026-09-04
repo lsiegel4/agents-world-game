@@ -123,7 +123,9 @@ class Agent:
     restraint_base: float = RESTRAINT_BASE
     grudges: dict = field(default_factory=dict)   # agent_id -> accumulated offence
     memory: object = None                         # world.memory.Memory, lazily attached
-    goal: str = ""                                # private; not visible to other agents
+    goal: dict = field(default_factory=dict)      # private; never in another agent's view
+    goal_history: list = field(default_factory=list)   # every goal held, in order
+    counters: dict = field(default_factory=dict)  # tallies goals are scored against
     techniques: set = field(default_factory=set)  # what this agent knows how to do
     favors: dict = field(default_factory=dict)    # agent_id -> kindness owed; grudge's mirror
     bonds: set = field(default_factory=set)       # agent_ids this agent is tied to

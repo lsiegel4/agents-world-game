@@ -86,6 +86,37 @@ def _observation(world, agent, nearby_agents, nearby_nodes) -> str:
     return "\n".join(lines)
 
 
+GOAL_PHRASING = {
+    "accumulate": "put by {threshold:.0f} food against hard times",
+    "master":     "learn {threshold:.0f} different crafts",
+    "teach":      "pass what you know to {threshold:.0f} people",
+    "bond":       "bind yourself to {threshold:.0f} people",
+    "lineage":    "have {threshold:.0f} children",
+    "outlive":    "live to see {threshold:.0f}",
+    "provide":    "give to others {threshold:.0f} times",
+    "avenge":     "settle what {target} did to you",
+}
+
+
+def _goal_block(agent) -> str:
+    """The agent's own private goal, in its own terms.
+
+    This is rendered only into the prompt of the agent who holds it. Nothing in
+    `_observation` exposes anyone else's — an agent infers what others want from
+    what they do, which is the whole point of §2.1's private goals.
+    """
+    goal = agent.goal
+    if not goal:
+        return ""
+    phrasing = GOAL_PHRASING.get(goal["kind"])
+    if not phrasing:
+        return ""
+    return ("What you have set yourself to do: "
+            + phrasing.format(threshold=goal.get("threshold", 0),
+                              target=goal.get("target", "them"))
+            + ". You have told nobody this.")
+
+
 def _memory_block(agent, tick: int) -> str:
     if agent.memory is None:
         return ""
@@ -111,6 +142,7 @@ def render(world, agent, nearby_agents, nearby_nodes, brief: str = "") -> dict:
     system = "\n\n".join([SCAFFOLD, _drive_ranking(agent)])
     parts = [
         _self_state(agent),
+        _goal_block(agent),
         _observation(world, agent, nearby_agents, nearby_nodes),
         _memory_block(agent, world.tick),
         _brief_block(brief),
