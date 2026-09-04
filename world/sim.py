@@ -121,6 +121,16 @@ def run(seed: int, ticks: int, config: dict = None):
         {"event": name, "base_p": base} for name, base, _, _ in deck.DECK
     ]
     world = make_world(seed, cfg)
+    for agent in world.agents:
+        log.emit(0, "spawn", agent=agent.id, generation=0,
+                 x=agent.x, y=agent.y, age=agent.age,
+                 food=agent.has("food"), drives=dict(agent.drives),
+                 # Distance to the nearest node of each kind is the spatial half
+                 # of endowment, and M0 showed it dominates survival.
+                 d_food=min((max(abs(n.x - agent.x), abs(n.y - agent.y))
+                             for n in world.nodes if n.kind == "food"), default=-1),
+                 d_wood=min((max(abs(n.x - agent.x), abs(n.y - agent.y))
+                             for n in world.nodes if n.kind == "wood"), default=-1))
     # Separate streams: worldgen, agent cognition, and the deck each draw from
     # their own PRNG, so changing deck parameters does not reshuffle the jitter
     # in every agent's decision and vice versa. Ablations stay comparable.

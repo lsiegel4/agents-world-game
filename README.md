@@ -3,7 +3,7 @@
 Headless simulation of a world of agents with private, heterogeneous goals.
 Design: [DESIGN.md](DESIGN.md). Spectator mockup: `mockup/spectator.html`.
 
-**Status: M0 complete**, plus the §4.5 event deck pulled forward. No LLM anywhere.
+**Status: M0 and M2 complete**, plus the §4.5 event deck. No LLM anywhere.
 Every agent runs on utility AI over its drive vector — this is the permanent non-LLM
 control arm from §7.5, not a placeholder to be replaced. M1 (cognition) has not
 started.
@@ -36,8 +36,11 @@ No dependencies. Python 3.9+.
 | `world/deck.py` | Event deck — state-weighted draws, mixed valence, non-starvation death |
 | `world/sim.py` | Tick loop, drive dynamics, starvation |
 | `world/log.py` | Append-only JSONL event log, SHA-256 digest |
-| `world/indices.py` | Population only; the §7.1 vector arrives in M2 |
-| `gate.py` | The M0 gate |
+| `world/indices.py` | The measurable slice of the §7.1 index vector |
+| `world/profiles.py` | Per-agent behavioral profiles, luck, attribution (§7.2–3) |
+| `world/stats.py` | Gini, entropy, Cohen's d, standardized OLS — no dependencies |
+| `gate.py` | The M0 gate (retired; kept as the record of what M0 tested) |
+| `study.py` | Experiment harness: indices, ablation, attribution, replay |
 
 ## Mechanics
 
@@ -185,3 +188,63 @@ asked to stand in for them.
 
 **Known limit.** The tool schema still has no verb for violence or theft — see the open
 question in §12, which governs what the norm-compliance index can mean.
+
+
+## M2 — measurement
+
+Five of the ten §7.1 indices are computable from the M0 world. The other five are
+listed in `indices.UNAVAILABLE` with the reason, and a test asserts they are never
+silently emitted — a proxy would let a result be reported for something the
+simulation cannot actually measure. Same discipline for the six behavioral-profile
+fields that need M1's social verbs.
+
+```
+index                   mean       sd      min      max
+population             5.900    4.218     0.00    15.00
+material_output      812.811  913.136   157.52  2877.47
+inequality             0.175    0.133     0.00     0.39
+drive_diversity        0.797    0.399     0.00     1.00
+life_expectancy      217.280   17.437   189.00   256.30
+```
+
+### Ablation: the deck, 20 paired seeds
+
+```
+index                     on       off     delta   cohen d
+population             5.900     6.050    -0.150     -0.04
+material_output      812.811   302.549   510.262      0.79
+inequality             0.175     0.245    -0.070     -0.59
+drive_diversity        0.797     0.996    -0.199     -0.71
+life_expectancy      217.280   206.240    11.040      0.32
+```
+
+The deck has almost no effect on how many agents there are (d = −0.04) and a large
+effect on everything else. It nearly triples material output, and it *reduces* both
+inequality and drive diversity. The diversity result was not predicted: shared shocks
+appear to homogenize the population, plausibly because frost and storms move every
+agent's survival drive in the same direction at the same time. Stated as a hypothesis —
+testing it needs the per-drive time series, which is M3 work.
+
+### Attribution: what determines how long an agent lives
+
+`lifespan ~ endowment + luck + policy`, standardized betas, 20 seeds × 4000 ticks,
+2312 agents lived, n = 1537 after exclusions, R² = 0.295.
+
+```
+  luck               0.4573  ##################
+  policy             0.3376  #############
+  endowment          0.0698  ##
+```
+
+Luck outweighs policy, and both dwarf endowment. This is §7.2's decomposition working
+as designed: the engine dealt the deck, so each agent's realized luck is *known*, not
+inferred — the counterfactual that field social science cannot get.
+
+**The first version of this analysis was wrong, and the way it was wrong is worth
+recording.** Policy initially scored 1.60 against luck's 0.24, with R² = 0.70. The
+cause was that `specialization` was computed as `1 − entropy(verb counts)` over an
+agent's whole life: an agent that dies young takes fewer actions, touches fewer distinct
+verbs, and therefore scores as more specialized *because it died*. The predictor was
+partly the outcome. Policy is now measured over each agent's first 100 actions only,
+agents that did not survive that window are excluded, and R² fell to 0.295 — most of the
+original explanatory power was the artifact. `test_policy_window_is_bounded` guards it.

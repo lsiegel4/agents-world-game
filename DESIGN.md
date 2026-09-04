@@ -531,8 +531,12 @@ reasons the M0 gate was retired rather than patched, are in README.md.
 **M1 — Cognition.** State→prompt rendering, tier routing, tools, memory with decay and
 consolidation. Single cheap model. Sandbox mode only.
 
-**M2 — Measurement.** Index computation, action-log behavioral profiles, seeded replay,
-first ablation study (`teach` on/off). First real answer to question 1.
+**M2 — Measurement. ✅ Complete 2026-09-04.** Index computation, action-log behavioral
+profiles, seeded replay, effect-size reporting, and the §7.2 attribution decomposition.
+The first ablation is the event deck rather than `teach`, which does not exist until M1.
+First real answer to question 5: pooled over 1537 agents, luck (β 0.46) outweighs policy
+(0.34), and both dwarf endowment (0.07). See README.md, including the confound that
+inflated policy threefold in the first version of the analysis.
 
 **M3 — World generation.** Full nine-pass generator with history and myth. Compare
 agent behavior in generated-history worlds vs blank worlds; expect large legibility gains.

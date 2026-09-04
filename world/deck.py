@@ -186,6 +186,10 @@ def draw(world, rng, log, scale: float = 1.0) -> None:
         log.emit(world.tick, "deck", event=name, p=round(p, 5),
                  helped=helped, harmed=harmed,
                  unaffected=max(0, len(world.living_agents()) - helped - harmed),
-                 deaths=deaths)
+                 deaths=deaths,
+                 # Per-agent valence, so §7.2's attribution decomposition can
+                 # separate luck from policy exactly — the engine dealt the deck,
+                 # so it knows precisely who it fell on.
+                 valence=valence)
         if name in DISASTERS:
             world.last_disaster = world.tick
