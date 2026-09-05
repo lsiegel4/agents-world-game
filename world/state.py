@@ -32,12 +32,11 @@ EXPOSURE_PENALTY = 1.4      # hunger multiplier at zero shelter
 # Reproduction. A child inherits its parent's *current* drive vector plus noise,
 # not the archetype baseline — so generational drift is measurable and DESIGN.md
 # §7.6's value lock-in test (founder cohort vs later generations) is runnable.
-REPRO_MIN_AGE = 60
 REPRO_MIN_FOOD = 9.0
 REPRO_FOOD_COST = 6.0       # paid by the parent
 REPRO_CHILD_FOOD = 3.0      # of which the child is endowed with this much
 REPRO_MIN_SHELTER = 0.6
-REPRO_COOLDOWN = 80
+REPRO_COOLDOWN = 70
 DRIVE_INHERIT_NOISE = 0.06
 
 # --- Violence (§5.5, §5.6) -------------------------------------------------
@@ -63,6 +62,50 @@ HARM_HUNGER = 10.0
 HARM_DEATH_P = 0.15
 GRUDGE_PER_OFFENSE = 1.0
 GRUDGE_DECAY = 0.0015
+
+# Vigilance — frequency dependence for violence (§2.1).
+#
+# Violence had a flat cost regardless of how many others were doing it, so
+# declining it was dominant from any starting mix: archetypes ranked by their
+# harm affinity, scholars went from 17% of founders to 62% of survivors, and a
+# world with one winning strategy has a global objective by the back door.
+#
+# Being robbed or attacked, or seeing it happen, makes a person watchful. A
+# watchful target is harder to rob. So in a basin where violence is common
+# everyone is guarded and predation stops paying; in a peaceful one nobody is,
+# and it pays well. The advantage of each strategy now decays as it spreads,
+# which is what keeps a mix rather than a winner.
+VIGILANCE_PER_WRONG = 0.40
+VIGILANCE_PER_WITNESS = 0.18
+VIGILANCE_DECAY = 0.0035
+VIGILANCE_RESIST = 0.85      # how much a fully watchful target blunts a theft
+
+# --- Time (§4.3) -----------------------------------------------------------
+#
+# The tick is the only unit. Everything else is derived from it.
+#
+# There is no "year" anywhere in the engine, deliberately. No single mapping to
+# real time was consistent with the rates: starvation takes 40 ticks (about
+# right for days), a meal lasts 12 (wrong for days), and a life ran 900 (wrong
+# for anything). The rates were each tuned for legibility in isolation. Rather
+# than pretend a tick is a day and re-tune the whole simulation, the tick is
+# declared primitive and a season is a named multiple of it.
+TICKS_PER_SEASON = 50
+
+# Senescence. Agents aged without limit and reached 1200+ ticks, so a "third
+# generation" shared the world with its founders — not a succession, and it
+# makes every generational measure meaningless including §7.6's lock-in test.
+LIFESPAN_MEAN = 400.0        # ~8 seasons
+LIFESPAN_SD = 110.0
+LIFESPAN_MIN = 150.0
+
+# Fertility is a FRACTION of a life, not a free-standing number. Set
+# independently they drifted to a 15:1 ratio — an agent fertile for 840 of its
+# 900 ticks — so eleven generations overlapped where a population should carry
+# three or four. Measured: turning senescence on changed the overlap from 9.8
+# to 10.5, i.e. not at all. The ratio was always the cause.
+FERTILE_FROM = 0.33
+REPRO_MIN_AGE = int(LIFESPAN_MEAN * FERTILE_FROM)
 
 # --- Social verbs (§5.5, M1 slice 2) ---------------------------------------
 GIVE_AMOUNT = 3.0
@@ -119,6 +162,7 @@ class Agent:
     hunger: float = 0.0
     shelter: float = 1.0
     age: int = 0
+    lifespan: float = LIFESPAN_MEAN
     alive: bool = True
     cause_of_death: str = ""
     archetype: str = "artisan"                    # §6.1; engine-owned, never user-set
@@ -128,6 +172,7 @@ class Agent:
     restraint: float = RESTRAINT_BASE
     restraint_base: float = RESTRAINT_BASE
     grudges: dict = field(default_factory=dict)   # agent_id -> accumulated offence
+    vigilance: float = 0.0                        # watchfulness; see §2.1 note above
     memory: object = None                         # world.memory.Memory, lazily attached
     goal: dict = field(default_factory=dict)      # private; never in another agent's view
     goal_history: list = field(default_factory=list)   # every goal held, in order

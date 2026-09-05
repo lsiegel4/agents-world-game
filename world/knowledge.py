@@ -35,6 +35,20 @@ TECHNIQUES = {
 }
 
 DISCOVERY_BASE = 0.0016      # per work action, scaled by curiosity
+
+# Ambient learning — frequency dependence for knowledge (§2.1, §4.1).
+#
+# Techniques are not inherited, so every generation relearns from scratch, and
+# learning required someone to actively teach you. That made the archetype best
+# at acquisition win permanently regardless of how much the world already knew:
+# scholars went from 17% of founders to 62% of survivors, holding 2.6x the
+# techniques and having 2x the children of a zealot.
+#
+# A technique everyone around you uses is not taught, it is absorbed. The
+# prevalence term is squared so this only applies to things that are genuinely
+# common — a rare craft still needs a teacher, and the scholar's advantage is
+# real while knowledge is scarce and fades as it saturates.
+AMBIENT_BASE = 0.010
 FOOD_YIELD_BONUS = 0.30
 WOOD_YIELD_BONUS = 0.30
 MEAL_BONUS = 0.35
@@ -70,6 +84,29 @@ def try_discover(agent, rng) -> str:
     if rng.random() >= p * len(options):
         return ""
     return options[rng.randrange(len(options))]
+
+
+def prevalence(agents) -> dict:
+    """Fraction of the living who hold each technique."""
+    live = list(agents)
+    if not live:
+        return {}
+    counts = {}
+    for agent in live:
+        for name in agent.techniques:
+            counts[name] = counts.get(name, 0) + 1
+    return {name: count / len(live) for name, count in counts.items()}
+
+
+def try_absorb(agent, common: dict, rng) -> str:
+    """Pick up something that everyone around you already does."""
+    for name in available_to(agent.techniques):
+        share = common.get(name, 0.0)
+        if share <= 0.0:
+            continue
+        if rng.random() < AMBIENT_BASE * share * share:
+            return name
+    return ""
 
 
 def yield_multiplier(agent, kind: str) -> float:

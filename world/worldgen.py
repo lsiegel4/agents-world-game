@@ -107,7 +107,7 @@ def make_world(seed: int, config: dict) -> World:
     grid = terrain_pass.generate_terrain(config["width"], config["height"], seed)
     sites = terrain_pass.settlement_sites(grid, config.get("sites", 4))
     ruin_list = terrain_pass.ruins(grid, sites, rng, config.get("ruins", 3))
-    hist = history_pass.generate_history(sites, rng, config.get("history_years", 300))
+    hist = history_pass.generate_history(sites, rng, config.get("history_seasons", 600))
     culture = history_pass.generate_culture(hist, rng)
     myths = history_pass.generate_myth(hist, rng)
     institutions = generate_institutions(hist, rng)

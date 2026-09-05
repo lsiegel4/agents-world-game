@@ -762,3 +762,85 @@ In one seed, scholars were 82 of 108 survivors — archetype selection may be st
 to collapse diversity over time. Not measured across seeds yet, and worth doing before
 archetypes are called finished. The scaffolds are written but not yet wired into
 `prompt.py`, so the LLM arm does not see them.
+
+
+## Archetype selection, and what it revealed (2026-09-05)
+
+Archetypes were built to create pluralism. Measured across 6 seeds and 720 founders, they
+create a **winner** instead: scholars go from 17% of founders to 62% of survivors.
+
+### Two wrong diagnoses before the right one
+
+**Not violence avoidance.** The survival order matched the harm affinities exactly, so the
+first theory was that declining violence pays. A vigilance mechanic was built on it —
+being robbed or witnessing a robbery makes an agent watchful, and a watchful target is
+harder to rob, so predation should stop paying once common. It engaged at a mean vigilance
+of **0.022**: violence is already too rare in the baseline for anyone to become watchful.
+The mechanic is kept — it is sound on its own terms and should matter in violent worlds —
+but it did not explain the result.
+
+**Not production efficiency.** Zealots are the *most* productive archetype at 70% of
+actions, and hold 3% of survivors. Scholars spend 42% of their turns walking and win.
+
+**It is technique accumulation.** Scholars hold 5.45 techniques to a zealot's 2.07 and
+have twice the children. Techniques multiply yield, nutrition, carry and repair, so a
+scholar needs fewer work actions and each one pays more.
+
+The reason it never self-corrects: **techniques are not inherited.** Every generation
+relearns from scratch, and learning required someone to actively teach you — so the
+archetype best at acquisition wins permanently, no matter how much the world already knows.
+
+### Ambient learning
+
+A technique everyone around you uses is not taught, it is absorbed. Prevalence is squared,
+so only genuinely common things transmit passively: a rare craft still needs a teacher, and
+the scholar's edge is real while knowledge is scarce and fades as it saturates.
+
+Effect: scholars 62% -> 55%, and every archetype gained techniques. Real, and modest.
+
+### Does the world change who wins?
+
+Six conditions, 4 seeds each:
+
+```
+condition          arti  brok  scho  stew  wand  zeal   pop
+baseline            24%    3%   58%   10%    2%    3%   129
+scarce               5%    5%   62%   21%    2%    5%    64
+abundant            33%    3%   52%    7%    3%    3%   222
+no teaching         21%    5%   42%   21%    5%    5%    51
+no deck             17%    4%   59%   13%    3%    4%   113
+harsh + violent      9%    7%   66%   11%    4%    2%    30
+```
+
+**Conditions reorder second place decisively.** Under scarcity the artisan collapses
+24% -> 5% while the steward doubles to 21%: when food is tight, mending and hoarding beat
+making. Abundance inverts it exactly. Violence lets the broker climb.
+
+**But scholars win all six**, 42% to 66%, and are most dominant in the harshest condition.
+
+The reason is that every condition tested varies *resources*; none of them touch the
+*status of knowledge*. Scarcity, abundance, disruption and crowding all change how much
+there is to go around. None makes knowing things costly, so techniques compound in all of
+them.
+
+Dethroning the scholar needs a world where knowledge is dangerous or useless — a basin
+that persecutes the wise, a collapse that destroys the technique graph, an environment
+where yield bonuses stop mattering. Nothing in the current world can express any of that.
+Logged in §12: the generated world needs to reach into the fitness landscape, not only
+into flavour.
+
+## Goals now point at the world (2026-09-05)
+
+`outlive` is removed. It completed by doing nothing, so it never went stale and always
+eventually succeeded — an absorbing state that held 21 of 22 survivors by t=3000.
+
+Two kinds replace it, both pointing at what the §4.1 generator produced:
+
+- **`recover`** — learn a technique almost nobody alive still holds. §4.1 makes recovering
+  lost knowledge a first-class goal; this is the version the engine can evaluate.
+- **`pilgrimage`** — stand where something happened, at a named ruin. Arrival is the whole
+  of it.
+
+Goal diversity among the living went from **one kind to six**, and all nine kinds now get
+completed: teach 62, master 43, avenge 34, provide 32, pilgrimage 29, bond 25, lineage 22,
+accumulate 18, recover 12, with 41 abandonments.

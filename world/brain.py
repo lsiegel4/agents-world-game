@@ -9,7 +9,8 @@ with a small seeded jitter to break ties without breaking determinism.
 from . import archetypes, knowledge
 
 GOAL_VERB = {"teach": "teach", "provide": "give", "lineage": "reproduce",
-             "bond": "form_bond", "master": "work", "accumulate": "work"}
+             "bond": "form_bond", "master": "work", "accumulate": "work",
+             "recover": "work"}
 from .state import (
     FOOD,
     INTERACT_RADIUS,
@@ -168,9 +169,12 @@ def candidates(world: World, agent: Agent, witness_count: int = 0,
                     # Same need+pressure shape as `work`, so theft and honest
                     # labour are scored on comparable terms. STEAL_URGE carries
                     # the real advantage: a theft yields more than a harvest and
-                    # costs no travel. What it risks is being seen.
+                    # costs no travel. What it risks is being seen — and a
+                    # watchful mark is visibly not worth trying, which is what
+                    # makes predation unprofitable once it becomes common.
                     take = w["survival"] * (0.6 * need[FOOD] + 0.6 * pressure[FOOD]) * STEAL_URGE
-                    out.append((take * disinhibited, "steal", {"target_id": other.id}))
+                    out.append((take * disinhibited * (1.0 - other.vigilance),
+                                "steal", {"target_id": other.id}))
 
                 strike = w["survival"] * hunger_norm * HARM_URGE + grudge * GRUDGE_URGE
                 out.append((strike * disinhibited, "harm", {"target_id": other.id}))
@@ -179,7 +183,8 @@ def candidates(world: World, agent: Agent, witness_count: int = 0,
                 # works on someone who believes you would strike.
                 if other.has(FOOD) > 0 and agent.has(FOOD) < MAX_CARRY:
                     demand = w["survival"] * (0.6 * need[FOOD] + 0.6 * pressure[FOOD])
-                    out.append((demand * COERCE_URGE * disinhibited,
+                    out.append((demand * COERCE_URGE * disinhibited
+                                * (1.0 - 0.7 * other.vigilance),
                                 "coerce", {"target_id": other.id}))
 
     out.append((0.05, "idle", {}))
@@ -192,6 +197,18 @@ def candidates(world: World, agent: Agent, witness_count: int = 0,
            for u, verb, params in out]
 
     # Goals move behaviour, or they are decoration on a state dict.
+    # A pilgrimage is a destination, not a verb: offer the walk toward it.
+    if agent.goal.get("kind") == "pilgrimage" and agent.goal.get("target"):
+        try:
+            tx, ty = (int(v) for v in agent.goal["target"].split(","))
+        except ValueError:
+            tx = ty = None
+        if tx is not None:
+            dist = max(abs(agent.x - tx), abs(agent.y - ty))
+            if dist > 2:
+                out.append((w["curiosity"] * 0.55 / (1.0 + 0.06 * dist),
+                            "move_to", {"x": tx, "y": ty}))
+
     goal_verb = GOAL_VERB.get(agent.goal.get("kind"))
     if goal_verb:
         out = [(u + GOAL_PULL if verb == goal_verb else u, verb, params)

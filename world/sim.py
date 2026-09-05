@@ -12,12 +12,16 @@ from .genesis import BASELINE_DRIVES, make_world
 from .log import EventLog
 from .state import (
     FAVOR_DECAY,
+    LIFESPAN_MEAN,
+    LIFESPAN_MIN,
+    LIFESPAN_SD,
     GRUDGE_DECAY,
     MESSAGE_TTL,
     HUNGER_PER_TICK,
     INTERACT_RADIUS,
     RESTRAINT_HUNGER_EROSION,
     RESTRAINT_RECOVERY,
+    VIGILANCE_DECAY,
     SHELTER_DECAY,
     STARVATION_THRESHOLD,
     WITNESS_RADIUS,
@@ -39,10 +43,11 @@ DEFAULT_CONFIG = {
     "worldgen": "flat",
     "sites": 4,
     "ruins": 3,
-    "history_years": 300,
+    "history_seasons": 600,
     "inequality": 0.5,
     "deck": True,          # set False for the §7.3 no-deck ablation arm
     "violence": True,      # set False for the no-defection ablation arm
+    "senescence": True,    # set False to let agents age without limit (§4.3 ablation)
     # Any verb named here is removed from the action space. This is the §7.3
     # ablation mechanism: run matched worlds with a verb withheld and compare.
     "disabled_verbs": (),
@@ -116,6 +121,8 @@ def apply(world: World, agent, verb: str, params: dict, rng, log, w: int = 0, op
         actions.speak(world, agent, params["target_id"], log, w, opp)
     elif verb == "leave_message":
         actions.leave_message(world, agent, log, w, opp)
+    elif verb == "move_to":
+        actions.move_to(world, agent, params["x"], params["y"], log, w, opp)
     elif verb == "coerce":
         actions.coerce(world, agent, params["target_id"], rng, log, w, opp)
     else:
@@ -187,6 +194,7 @@ def update_restraint(agent) -> None:
     target = agent.restraint_base - RESTRAINT_HUNGER_EROSION * hunger_norm
     agent.restraint = max(0.0, min(1.0,
         agent.restraint + RESTRAINT_RECOVERY * (target - agent.restraint)))
+    agent.vigilance = max(0.0, agent.vigilance - VIGILANCE_DECAY)
     for other_id in list(agent.grudges):
         agent.grudges[other_id] -= GRUDGE_DECAY
         if agent.grudges[other_id] <= 0:
@@ -199,6 +207,8 @@ def step(world: World, rng, log, deck_rng=None, cfg=None, mind=None,
     world.tick += 1
 
     violence = bool(cfg.get("violence", True)) if cfg else True
+    # Computed once per tick: what the basin as a whole knows how to do.
+    common = knowledge.prevalence(world.living_agents())
     disabled = frozenset(cfg.get("disabled_verbs", ())) if cfg else frozenset()
 
     for agent in world.living_agents():
@@ -222,6 +232,11 @@ def step(world: World, rng, log, deck_rng=None, cfg=None, mind=None,
             verb, params = "idle", {}
         apply(world, agent, verb, params, rng, log, w, opp)
         tally(agent, verb, params)
+        # Arriving is the whole of a pilgrimage; nothing else marks it done.
+        if agent.goal.get("kind") == "pilgrimage" and agent.goal.get("target"):
+            tx, ty = (int(v) for v in agent.goal["target"].split(","))
+            if max(abs(agent.x - tx), abs(agent.y - ty)) <= goals.PILGRIMAGE_RADIUS:
+                agent.counters["pilgrimage:" + agent.goal["target"]] = 1.0
         review_goal(world, agent, goal_rng or rng, log)
         update_drives(agent, verb)
         update_restraint(agent)
@@ -239,6 +254,12 @@ def step(world: World, rng, log, deck_rng=None, cfg=None, mind=None,
                 log.emit(world.tick, "discovery", agent=agent.id, technique=found,
                          depth=knowledge.depth(found))
 
+        absorbed = knowledge.try_absorb(agent, common, rng)
+        if absorbed:
+            agent.techniques.add(absorbed)
+            log.emit(world.tick, "absorbed", agent=agent.id, technique=absorbed,
+                     prevalence=round(common.get(absorbed, 0.0), 3))
+
         # Reading what someone left behind, including the dead.
         for msg in world.messages:
             if msg["x"] == agent.x and msg["y"] == agent.y and msg["by"] != agent.id:
@@ -247,11 +268,36 @@ def step(world: World, rng, log, deck_rng=None, cfg=None, mind=None,
                     agent.grudges[msg["about"]] = (
                         agent.grudge_against(msg["about"]) + 0.25)
 
+        if agent.age >= agent.lifespan:
+            agent.alive = False
+            agent.cause_of_death = "old age"
+            log.emit(world.tick, "death", agent=agent.id, cause="old age",
+                     age=agent.age, shelter=round(agent.shelter, 3))
+            continue
+
         if agent.hunger >= STARVATION_THRESHOLD:
             agent.alive = False
             agent.cause_of_death = "starvation"
+            # Was there food? A death from want in a world with plenty is a
+            # distribution failure and politics could fix it; a death in a world
+            # with nothing is Malthusian and no institution helps. The engine
+            # knows which, so record it rather than assume.
+            others = [o for o in world.living_agents() if o is not agent]
+            held = sum(o.has("food") for o in others)
+            standing = sum(n.amount for n in world.nodes if n.kind == "food")
+            near_food = [n for n in world.nodes if n.kind == "food" and n.amount > 0]
+            nearest = min((max(abs(n.x - agent.x), abs(n.y - agent.y))
+                           for n in near_food), default=-1)
+            close_helpers = sum(
+                1 for o in others
+                if o.has("food") > 1.0
+                and max(abs(o.x - agent.x), abs(o.y - agent.y)) <= 3)
             log.emit(world.tick, "death", agent=agent.id, cause="starvation",
-                     age=agent.age, shelter=round(agent.shelter, 3))
+                     age=agent.age, shelter=round(agent.shelter, 3),
+                     food_held_by_others=round(held, 1),
+                     food_standing_in_nodes=round(standing, 1),
+                     dist_to_nearest_food=nearest,
+                     helpers_within_3=close_helpers)
 
     for node in world.nodes:
         node.regenerate()
@@ -312,6 +358,8 @@ def run(seed: int, ticks: int, config: dict = None, mind=None):
 
     for agent in world.agents:
         agent.goal = goals.generate(agent, goal_rng, world)
+        agent.lifespan = (max(LIFESPAN_MIN, rng.gauss(LIFESPAN_MEAN, LIFESPAN_SD))
+                          if cfg.get("senescence", True) else float("inf"))
 
     for _ in range(ticks):
         step(world, rng, log, deck_rng, cfg, mind, goal_rng)

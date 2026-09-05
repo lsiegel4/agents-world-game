@@ -686,6 +686,27 @@ Closed alpha of sandbox mode.
   in a named era, rebuild a named ruin, hold a seat at an institution — rather than at
   a bare number.
 - Whether goal attainment should ever be visible to other agents, or only inferrable.
+- **Archetypes should hold biases about each other.** Currently an archetype is a
+  disposition toward *verbs*; it carries no view of other kinds. Adding inter-archetype
+  regard — a steward who distrusts brokers, a zealot who will not be taught by a scholar,
+  a broker who deals only with those who can pay — turns the six into something closer to
+  classes than professions, and makes standing, bonding and teaching depend on *who* is
+  offering rather than only on what they did. That is also the cheapest route to
+  persecution: it needs no new verb, only a bias term in `standing()` and in whether a
+  `teach` or `form_bond` is accepted. Worth pairing with the fitness point below, since a
+  world where the wise are distrusted is exactly the condition that dethrones the scholar.
+- **Which archetype thrives should depend on the world, not on the archetype.** §2.1
+  forbids a global objective; it does not forbid a strategy that wins *in a particular
+  basin*. Measured 2026-09-05, scholars go from 17% of founders to 55-62% of survivors in
+  every condition tried, because techniques compound and nothing in the world punishes
+  knowing things. Balancing affinities until nobody wins would be fitting the world to a
+  preference — the `regen_rate` mistake. The right answer is that conditions should
+  differentially favour kinds: scarcity should reward the hoarder over the scholar; a
+  world whose history was lost should have nothing to teach; a basin where strength
+  decides should persecute the wise rather than feed them; an isolated one should punish
+  the wanderer. That means the generated world (§4.1) needs to reach into the fitness
+  landscape rather than only into flavour — its era kinds, its institutions and its
+  scarcity should change who does well. Currently none of them do.
 - **Archetypes are currently a label, not a mechanism.** §6.1 specifies six, and they are
   meant to differ in locked scaffold, initial drive vector, endowment distribution and
   tool affinities; today they differ in none of those, and every agent shares one generic

@@ -176,8 +176,13 @@ def _visibility(rng, age_fraction: float) -> str:
     return "lost"
 
 
-def generate_history(sites: list, rng, years: int = 300) -> dict:
-    """Pass 4. Eras, and the facts inside them, each with a visibility."""
+def generate_history(sites: list, rng, years: int = 600) -> dict:
+    """Pass 4. Eras, and the facts inside them, each with a visibility.
+
+    Measured in seasons. The engine has no year (§4.3) — the tick is primitive
+    and a season is a named multiple of it, so the past is counted in the same
+    unit as the present rather than in a second clock nothing converts to.
+    """
     places = []
     while len(places) < max(1, len(sites)):
         name = (rng.choice(PLACE_PREFIX) + rng.choice(PLACE_SUFFIX))
@@ -227,7 +232,7 @@ def generate_history(sites: list, rng, years: int = 300) -> dict:
         year = era["to"]
         era_index += 1
 
-    return {"years": years, "eras": eras, "facts": facts, "places": places}
+    return {"seasons": years, "eras": eras, "facts": facts, "places": places}
 
 
 def generate_culture(history: dict, rng) -> dict:
@@ -247,7 +252,7 @@ def generate_culture(history: dict, rng) -> dict:
         taboos.append("the first cut of the season is left standing")
 
     festivals.append({"name": "the Feast of Nine Wells",
-                      "when": rng.randrange(history["years"]) % 360,
+                      "when": rng.randrange(history["seasons"]) % 4,
                       "for": "the dead of " + rng.choice(history["eras"])["name"]})
 
     return {"naming": rng.choice(("patronymic", "place-bound", "craft-bound")),

@@ -16,6 +16,7 @@ another agent's speech, a user's brief, an object it finds — can widen what it
 is able to do.
 """
 
+from . import archetypes
 from .state import FOOD, MAX_CARRY, STARVATION_THRESHOLD, WOOD
 
 SCAFFOLD = """You are one person living in a small world. You are not an assistant \
@@ -29,7 +30,9 @@ You do not know what anyone else wants. You cannot see inside another person, \
 only what they do and what they carry.
 
 Each turn you take exactly one action by calling one tool. Choose the action \
-this person would take, not the one that is most agreeable."""
+this person would take, not the one that is most agreeable.
+
+Call the tool. Do not explain yourself first."""
 
 
 def _drive_ranking(agent) -> str:
@@ -73,6 +76,8 @@ def _observation(world, agent, nearby_agents, nearby_nodes) -> str:
             # Only what is observable from outside. Never another agent's
             # drives, goal, hunger, or exact holdings.
             carrying = "carrying something" if other.has(FOOD) > 0 else "empty-handed"
+            if other.vigilance > 0.35:
+                carrying += ", and watchful"
             history = ""
             if agent.grudge_against(other.id) >= 1.0:
                 history = " — this one has wronged you"
@@ -169,7 +174,12 @@ def _brief_block(brief: str) -> str:
 
 
 def render(world, agent, nearby_agents, nearby_nodes, brief: str = "") -> dict:
-    system = "\n\n".join([SCAFFOLD, _drive_ranking(agent)])
+    # The archetype scaffold sits between the engine-owned frame and the drive
+    # ranking. It is engine-owned too (§6.1): a user's brief describes a
+    # character, it never selects or edits the scaffold.
+    system = "\n\n".join([SCAFFOLD,
+                           archetypes.spec(agent.archetype)["scaffold"],
+                           _drive_ranking(agent)])
     parts = [
         _self_state(agent),
         _goal_block(agent),
@@ -198,49 +208,60 @@ def _tool(name, description, properties=None, required=()):
     }
 
 
-def tool_schema(allow_violence: bool = True) -> list:
-    """The §5.5 verbs available in this M1 slice, as API tools.
+# Verbs that need someone within reach. Offering them when an agent is alone is
+# both wrong and expensive: the tool schema is ~70% of every prompt's input
+# tokens, so seven dead tools is most of the bill for a tick where nothing
+# social can happen.
+SOCIAL_VERBS = ("give", "teach", "form_bond", "speak", "steal", "harm", "coerce")
 
-    Deliberately the same set the utility AI has, so a T0-vs-T1 comparison
-    changes cognition and nothing else. The social verbs are a later slice, and
-    adding them at the same time would make the two variables inseparable.
+
+def tool_schema(allow_violence: bool = True, has_company: bool = True,
+                can_reproduce: bool = True) -> list:
+    """The §5.5 verbs, as API tools, filtered to what is actually possible now.
+
+    Filtering is not only a cost measure. An agent should not be offered an
+    action it cannot take — the engine would reject it, the turn would be
+    wasted, and the model would have spent tokens deciding between options that
+    were never real.
     """
     tools = [
         _tool("move", "Walk one step toward a place you can see.",
-              {"node_id": {"type": "string", "description": "id of the place"}},
-              ["node_id"]),
+              {"node_id": {"type": "string"}}, ["node_id"]),
         _tool("work", "Gather from the ground underfoot. You must be standing on it.",
-              {"node_id": {"type": "string", "description": "id of the place underfoot"}},
-              ["node_id"]),
+              {"node_id": {"type": "string"}}, ["node_id"]),
         _tool("eat", "Eat one of your food."),
         _tool("repair", "Spend one wood mending your shelter."),
-        _tool("reproduce", "Have a child. Costs food, and you must be fed and sheltered."),
         _tool("idle", "Do nothing this turn."),
+        _tool("leave_message", "Leave word here for whoever passes, even after you die."),
+    ]
+    if can_reproduce:
+        tools.append(_tool(
+            "reproduce",
+            "Have a child. Costs food, and you must be fed and sheltered."))
+
+    if not has_company:
+        return tools
+
+    tools += [
         _tool("give", "Hand food or wood to someone within reach.",
-              {"target_id": {"type": "string", "description": "id of the person"},
+              {"target_id": {"type": "string"},
                "resource": {"type": "string", "enum": ["food", "wood"]}},
               ["target_id", "resource"]),
         _tool("teach", "Show someone within reach how to do something you know.",
-              {"target_id": {"type": "string", "description": "id of the person"}},
-              ["target_id"]),
+              {"target_id": {"type": "string"}}, ["target_id"]),
         _tool("form_bond", "Offer to tie yourself to someone. They may refuse.",
-              {"target_id": {"type": "string", "description": "id of the person"}},
-              ["target_id"]),
+              {"target_id": {"type": "string"}}, ["target_id"]),
         _tool("speak", "Tell someone within reach what you know about a third person.",
-              {"target_id": {"type": "string", "description": "id of the person"}},
-              ["target_id"]),
-        _tool("leave_message", "Leave word here for whoever passes, even after you die."),
+              {"target_id": {"type": "string"}}, ["target_id"]),
     ]
+
     if allow_violence:
         tools += [
-            _tool("steal", "Take food from someone within reach, without their consent.",
-                  {"target_id": {"type": "string", "description": "id of the person"}},
-                  ["target_id"]),
+            _tool("steal", "Take food from someone within reach, without consent.",
+                  {"target_id": {"type": "string"}}, ["target_id"]),
             _tool("harm", "Attack someone within reach. This sometimes kills.",
-                  {"target_id": {"type": "string", "description": "id of the person"}},
-                  ["target_id"]),
+                  {"target_id": {"type": "string"}}, ["target_id"]),
             _tool("coerce", "Demand food from someone within reach, under threat.",
-                  {"target_id": {"type": "string", "description": "id of the person"}},
-                  ["target_id"]),
+                  {"target_id": {"type": "string"}}, ["target_id"]),
         ]
     return tools

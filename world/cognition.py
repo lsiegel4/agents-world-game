@@ -67,6 +67,22 @@ def _parse(response: dict):
     return None
 
 
+def cast(world, per_archetype: int = 1) -> set:
+    """Pick a cast spread across archetypes.
+
+    Choosing the most prominent agents instead would pick almost entirely
+    scholars — they are 55-62% of survivors in every condition measured — and a
+    cast drawn from one kind shows one kind of life.
+    """
+    chosen, seen = set(), {}
+    for agent in world.living_agents():
+        held = seen.get(agent.archetype, 0)
+        if held < per_archetype:
+            seen[agent.archetype] = held + 1
+            chosen.add(agent.id)
+    return chosen
+
+
 def _visible(world, agent, radius: int = 12):
     nodes = []
     for node in world.nodes:
@@ -81,12 +97,19 @@ class Cognition:
     """Chooses actions, escalating from the utility AI to a model as stakes rise."""
 
     def __init__(self, client=None, allow_violence: bool = True,
-                 on_cache_miss: str = "error", tier2: bool = False):
+                 on_cache_miss: str = "error", tier2: bool = False,
+                 principals=None):
         self.client = client
-        self.allow_violence = allow_violence
+        # A cast, not a population. `principals` is a set of agent ids allowed to
+        # escalate; everyone else stays on the utility AI however high the stakes
+        # get. Cost then scales with cast size rather than world size, which is
+        # the difference between ~$20 and ~$340 a month at 200 agents — and it is
+        # dramaturgically right, since every story has a foreground and a crowd.
+        # None means everyone may escalate.
+        self.principals = set(principals) if principals is not None else None
         self.on_cache_miss = on_cache_miss
         self.tier2 = tier2
-        self.tools = prompt.tool_schema(allow_violence)
+        self.allow_violence = allow_violence
         self.tier_counts = {0: 0, 1: 0, 2: 0}
         # Attempts are counted before the call. A fallback still escalated — it
         # still rendered a prompt and still would have cost money on a live run —
@@ -104,6 +127,8 @@ class Cognition:
             tier = 1
         if self.client is None:
             tier = 0
+        if self.principals is not None and agent.id not in self.principals:
+            tier = 0
 
         if tier == 0:
             self.tier_counts[0] += 1
@@ -112,11 +137,17 @@ class Cognition:
         model = TIER2_MODEL if tier == 2 else TIER1_MODEL
         self.attempts[tier] += 1
         rendered = prompt.render(world, agent, nearby, _visible(world, agent), brief)
+        # Offered tools follow the agent's actual affordances, so a tick where
+        # nothing social is possible costs ~40% fewer input tokens.
+        tools = prompt.tool_schema(
+            allow_violence=self.allow_violence and violence,
+            has_company=bool(nearby),
+            can_reproduce=agent.can_reproduce(world.tick))
         payload = {
             "model": model,
             "max_tokens": MAX_TOKENS,
             "system": rendered["system"],
-            "tools": self.tools,
+            "tools": tools,
             "messages": [{"role": "user", "content": rendered["user"]}],
         }
 

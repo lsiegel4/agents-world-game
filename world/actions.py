@@ -24,11 +24,17 @@ from .state import (
     HUNGER_PER_MEAL,
     MAX_CARRY,
     REPRO_CHILD_FOOD,
+    LIFESPAN_MEAN,
+    LIFESPAN_MIN,
+    LIFESPAN_SD,
     REPRO_FOOD_COST,
     RESTRAINT_INHERIT_NOISE,
     SHELTER_PER_WOOD,
     STEAL_AMOUNT,
     VICTIM_RESTRAINT_LOSS,
+    VIGILANCE_PER_WITNESS,
+    VIGILANCE_PER_WRONG,
+    VIGILANCE_RESIST,
     WITNESS_RADIUS,
     WOOD,
     Agent,
@@ -62,6 +68,7 @@ def _wrong(victim: Agent, offender_id: str) -> None:
     half of §5.6 — violence propagates through the people it lands on."""
     victim.grudges[offender_id] = victim.grudge_against(offender_id) + GRUDGE_PER_OFFENSE
     victim.restraint = max(0.0, victim.restraint - VICTIM_RESTRAINT_LOSS)
+    victim.vigilance = min(1.0, victim.vigilance + VIGILANCE_PER_WRONG)
 
 
 def move(world: World, agent: Agent, node_id: str, log, witness_count: int = 0, opp: int = 0) -> bool:
@@ -77,6 +84,20 @@ def move(world: World, agent: Agent, node_id: str, log, witness_count: int = 0, 
     agent.y += dy
     log.emit(world.tick, "action", agent=agent.id, verb="move",
              target=node_id, x=agent.x, y=agent.y, w=witness_count, opp=opp)
+    return True
+
+
+def move_to(world: World, agent: Agent, x: int, y: int, log,
+            witness_count: int = 0, opp: int = 0) -> bool:
+    """One step toward a place rather than a node — how a pilgrimage is walked."""
+    dx = (x > agent.x) - (x < agent.x)
+    dy = (y > agent.y) - (y < agent.y)
+    if dx == 0 and dy == 0:
+        return False
+    agent.x += dx
+    agent.y += dy
+    log.emit(world.tick, "action", agent=agent.id, verb="move_to",
+             to=f"{x},{y}", x=agent.x, y=agent.y, w=witness_count, opp=opp)
     return True
 
 
@@ -166,6 +187,12 @@ def reproduce(world: World, agent: Agent, rng, log, witness_count: int = 0, opp:
         # Uses no randomness, so it cannot perturb the decision stream.
         archetype=inherited,
         goal=goals.inherit(agent.goal, None, world) if agent.goal else {},
+        # A fresh draw each generation: lifespan is not inherited, so lineages
+        # cannot accumulate longevity and crowd out turnover.
+        # Matches the parent's condition: in a world without senescence the
+        # parent's span is infinite and so is the child's.
+        lifespan=(max(LIFESPAN_MIN, rng.gauss(LIFESPAN_MEAN, LIFESPAN_SD))
+                  if agent.lifespan != float("inf") else float("inf")),
         parent=agent.id,
         generation=agent.generation + 1,
         last_birth=world.tick,
@@ -185,9 +212,20 @@ def steal(world: World, agent: Agent, target_id: str, log, witness_count: int = 
     if victim is None or victim.has(FOOD) <= 0:
         return False
 
-    taken = min(STEAL_AMOUNT, victim.has(FOOD), MAX_CARRY - agent.has(FOOD))
-    if taken <= 0:
-        return False
+    # A watchful victim keeps most of what they have.
+    taken = min(STEAL_AMOUNT * (1.0 - VIGILANCE_RESIST * victim.vigilance),
+                victim.has(FOOD), MAX_CARRY - agent.has(FOOD))
+    if taken < 0.5:
+        # Foiled. It still counts as an attempt: the victim knows, and so do
+        # any bystanders, so the world gets more watchful either way.
+        _wrong(victim, agent.id)
+        for w in witnesses_of(world, agent, exclude=(victim.id,)):
+            w.vigilance = min(1.0, w.vigilance + VIGILANCE_PER_WITNESS)
+        log.emit(world.tick, "action", agent=agent.id, verb="steal",
+                 betrayal=target_id in agent.bonds, target=target_id,
+                 taken=0.0, foiled=True, witnesses=0, observed=False,
+                 restraint=round(agent.restraint, 3), w=witness_count, opp=opp)
+        return True
 
     victim.inventory[FOOD] -= taken
     agent.inventory[FOOD] = agent.has(FOOD) + taken
@@ -199,6 +237,7 @@ def steal(world: World, agent: Agent, target_id: str, log, witness_count: int = 
     seen = witnesses_of(world, agent, exclude=(victim.id,))
     for w in seen:
         w.grudges[agent.id] = w.grudge_against(agent.id) + GRUDGE_PER_OFFENSE * 0.4
+        w.vigilance = min(1.0, w.vigilance + VIGILANCE_PER_WITNESS)
 
     _remember(victim, world.tick, f"{agent.id} took food from you", 4.0, ("wronged",))
     _remember(agent, world.tick, f"you took food from {victim.id}", 2.5, ("did",))
@@ -230,6 +269,7 @@ def harm(world: World, agent: Agent, target_id: str, rng, log, witness_count: in
     for bystander in seen:
         _remember(bystander, world.tick,
                   f"you saw {agent.id} attack {victim.id}", 3.0, ("witnessed",))
+        bystander.vigilance = min(1.0, bystander.vigilance + VIGILANCE_PER_WITNESS)
 
     killed = rng.random() < HARM_DEATH_P
     log.emit(world.tick, "action", agent=agent.id, verb="harm",
@@ -373,7 +413,8 @@ def coerce(world: World, agent: Agent, target_id: str, rng, log,
     # Threat is credibility, not strength: an agent with little restraint left
     # is believed. Resistance comes from the target's own nerve and from ties.
     threat = (1.0 - agent.restraint) + 0.3 * min(1.0, other.grudge_against(agent.id))
-    resistance = other.restraint + (0.6 if agent.id in other.bonds else 0.0)
+    resistance = (other.restraint + other.vigilance
+                  + (0.6 if agent.id in other.bonds else 0.0))
     yielded = threat > resistance
 
     if yielded:
