@@ -105,8 +105,13 @@ class Cognition:
         # get. Cost then scales with cast size rather than world size, which is
         # the difference between ~$20 and ~$340 a month at 200 agents — and it is
         # dramaturgically right, since every story has a foreground and a crowd.
-        # None means everyone may escalate.
-        self.principals = set(principals) if principals is not None else None
+        # None means everyone may escalate. An int means "this many per
+        # archetype, chosen once the world exists" — the world is built inside
+        # run(), so a cast cannot be named before the call.
+        self.cast_per_archetype = principals if isinstance(principals, int) else None
+        self.principals = (set(principals)
+                           if principals is not None and not isinstance(principals, int)
+                           else None)
         self.on_cache_miss = on_cache_miss
         self.tier2 = tier2
         self.allow_violence = allow_violence
@@ -119,7 +124,46 @@ class Cognition:
         self.fallbacks = 0
         self.invalid = 0
 
+    def _maintain_cast(self, world, log) -> None:
+        """Pick the cast, and refill it as members die.
+
+        Lifespan is ~400 ticks, so a cast chosen at t=0 is dead well before a
+        run ends. A story follows whoever is alive; without refilling, the
+        experiment would silently become an all-Tier-0 run partway through and
+        the cost would quietly stop being spent.
+        """
+        if self.cast_per_archetype is None:
+            return
+        living = {a.id for a in world.living_agents()}
+        if self.principals is None:
+            self.principals = cast(world, self.cast_per_archetype)
+            log.emit(world.tick, "cast", members=sorted(self.principals))
+            return
+
+        surviving = self.principals & living
+        if len(surviving) == len(self.principals):
+            return
+
+        held = {}
+        by_id = {a.id: a for a in world.living_agents()}
+        for agent_id in surviving:
+            kind = by_id[agent_id].archetype
+            held[kind] = held.get(kind, 0) + 1
+        replacements = set()
+        for other in world.living_agents():
+            if other.id in surviving:
+                continue
+            kind = other.archetype
+            if held.get(kind, 0) < self.cast_per_archetype:
+                held[kind] = held.get(kind, 0) + 1
+                replacements.add(other.id)
+        if replacements:
+            log.emit(world.tick, "cast", promoted=sorted(replacements),
+                     lost=sorted(self.principals - living))
+        self.principals = surviving | replacements
+
     def choose(self, world, agent, rng, witness_count, violence, log, brief=""):
+        self._maintain_cast(world, log)
         nearby = brain.reachable(world, agent)
         score = stakes(world, agent, nearby)
         tier = route(score)
@@ -137,12 +181,17 @@ class Cognition:
         model = TIER2_MODEL if tier == 2 else TIER1_MODEL
         self.attempts[tier] += 1
         rendered = prompt.render(world, agent, nearby, _visible(world, agent), brief)
-        # Offered tools follow the agent's actual affordances, so a tick where
-        # nothing social is possible costs ~40% fewer input tokens.
+        # The utility AI already evaluates every precondition to score its own
+        # options, so its candidate set is the authoritative list of what this
+        # agent can actually do this tick. Deriving the tool schema from it means
+        # the model is never offered an action the engine will refuse.
+        possible = {verb for _, verb, _ in
+                    brain.candidates(world, agent, witness_count, violence)}
         tools = prompt.tool_schema(
             allow_violence=self.allow_violence and violence,
             has_company=bool(nearby),
-            can_reproduce=agent.can_reproduce(world.tick))
+            can_reproduce=agent.can_reproduce(world.tick),
+            allowed=possible)
         payload = {
             "model": model,
             "max_tokens": MAX_TOKENS,
@@ -177,13 +226,29 @@ class Cognition:
         verb, params = chosen
         return self._normalize(world, agent, verb, params)
 
+    # Verbs by the parameter they take. Kept as data so adding a verb to the
+    # tool schema without teaching the normalizer about it is impossible.
+    NODE_VERBS = ("move", "work")
+    TARGET_VERBS = ("steal", "harm", "coerce", "speak", "teach", "form_bond", "give")
+
     def _normalize(self, world, agent, verb, params):
-        """Map the model's arguments onto engine parameters. Anything the engine
-        cannot act on is left to fail there rather than being silently repaired —
-        an agent reaching for what it cannot have is behaviour, not a bug."""
-        if verb in ("move", "work"):
+        """Map the model's arguments onto engine parameters.
+
+        Every verb that takes an argument is listed. An earlier version covered
+        only move/work/steal/harm, so `speak` arrived with empty params and the
+        engine raised KeyError mid-run — the model was behaving correctly and
+        the harness was not.
+
+        Arguments that name something absent are passed through unchanged: the
+        engine refuses them and the action simply fails, which is behaviour
+        worth measuring rather than a bug worth repairing.
+        """
+        if verb in self.NODE_VERBS:
             return verb, {"node_id": params.get("node_id", "")}
-        if verb in ("steal", "harm"):
+        if verb == "give":
+            return verb, {"target_id": params.get("target_id", ""),
+                          "resource": params.get("resource", "food")}
+        if verb in self.TARGET_VERBS:
             return verb, {"target_id": params.get("target_id", "")}
         return verb, {}
 

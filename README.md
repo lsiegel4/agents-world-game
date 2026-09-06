@@ -844,3 +844,88 @@ Two kinds replace it, both pointing at what the §4.1 generator produced:
 Goal diversity among the living went from **one kind to six**, and all nine kinds now get
 completed: teach 62, master 43, avenge 34, provide 32, pilgrimage 29, bond 25, lineage 22,
 accumulate 18, recover 12, with 41 abandonments.
+
+
+## Time, senescence, and why people starve (2026-09-05)
+
+### One clock
+
+The engine has no "year". The tick is primitive and a **season is 50 ticks**; history is
+generated in seasons so the past is counted in the same unit as the present.
+
+No mapping to real time was consistent with the existing rates. Starvation takes 40 ticks
+(about right for days), a meal lasts 12 (wrong for days), a life ran 900 (wrong for
+anything). Each rate had been tuned for legibility in isolation, so they never shared a
+clock. Declaring the tick primitive is honest; pretending it is a day would buy realism
+the rates cannot honour.
+
+### Fertility is now a fraction of a life
+
+`REPRO_MIN_AGE` was 60 and `LIFESPAN_MEAN` was 900 — a **15:1 ratio**, set a milestone
+apart with nothing tying them together. An agent was fertile for 840 of its 900 ticks and
+**eleven generations coexisted** where a population should carry three or four.
+
+`FERTILE_FROM = 0.33` now derives fertility from lifespan, so the two cannot drift apart
+again. Lifespan is 400 ticks (~8 seasons), fertility begins at 132 (~2.6 seasons).
+
+```
+                        before    after
+generations coexisting    10.5      5.8
+population                 109    111.8
+mean age                   275      160
+old age, share of deaths     5%      27%
+```
+
+Population held — the risk was that agents would die before reaching a much later
+fertility age, and enough of them get there. Senescence went from an edge case to a real
+force. The residual overlap above 3-4 is explicable: mean age at death (160) is barely
+above the fertility threshold (132), so the average agent never breeds while those who do
+live to 400+ and keep having children.
+
+**A paired ablation showed senescence was not the cause of generational overlap** —
+turning it on moved the span from 9.8 to 10.5, i.e. not at all. The ratio was always the
+problem. Worth recording because senescence looked like the obvious fix and was not.
+
+### Why people starve
+
+1,168 starvation deaths, instrumented at the moment of death:
+
+```
+food held by other living agents   mean  672.4 units  (median 622.8)
+food standing in nodes             mean  948.3 units
+distance to nearest food node      mean    7.6 tiles  (median 7)
+living agents within 3 with food   mean    2.24
+
+died with someone holding food within 3 tiles:  871/1168  (75%)
+died more than 10 tiles from any food node:     309/1168  (26%)
+```
+
+**Starvation is a distribution failure, not scarcity.** Three quarters of the starving die
+with 2.24 neighbours carrying food within three tiles, while over 1,600 units exist in a
+world where one unit would have saved them.
+
+The mechanisms that would fix it are precisely the ones missing: no granary (nobody can
+hold surplus for anyone else — `MAX_CARRY` is 12), no way to signal need (there is no
+`ask`, so food flows along *standing* rather than along hunger, and a starving stranger is
+invisible to the giving rule), and institutions that hold nothing and allocate nothing.
+
+Roughly **3:1 distribution to distance**. Starvation is 42% of all deaths, so redistribution
+could plausibly remove most of it. That moves institutional sanction from "§5.6 says it is
+required" to the highest-leverage unbuilt mechanic in the world, justified by measurement
+rather than by citation.
+
+### Cost reductions
+
+Tool schema is now filtered by affordance — an agent alone is not offered `steal`, `teach`
+or `speak` — and the scaffold asks for the tool without preamble. Tools were **70% of every
+prompt's input tokens** (1470 of 2115), so not offering impossible actions is the largest
+available saving, and it is better modelling besides.
+
+```
+input   887 -> 723 tokens/decision   (18%)
+output  314 -> 154 tokens/decision   (51%, measured live on 5 calls)
+cost    $0.00246 -> $0.00149          (39%)
+```
+
+The model still writes a short preamble. Since removing deliberation may change *what* it
+chooses and not only how much it says, halving it is the safer trade.

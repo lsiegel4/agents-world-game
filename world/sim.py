@@ -95,11 +95,19 @@ def update_drives(agent, verb: str) -> None:
         d[k] = round(d[k], 6)
 
 
-def apply(world: World, agent, verb: str, params: dict, rng, log, w: int = 0, opp: int = 0) -> None:
+def apply(world: World, agent, verb: str, params: dict, rng, log,
+          w: int = 0, opp: int = 0) -> None:
+    """Dispatch one action.
+
+    Arguments are read defensively. A model can return a well-formed tool call
+    with a missing or nonsensical argument, and the engine must refuse it rather
+    than raise — a crash here takes down a whole run and, in a recording run,
+    strands everything bought up to that point.
+    """
     if verb == "move":
-        actions.move(world, agent, params["node_id"], log, w, opp)
+        actions.move(world, agent, params.get("node_id", ""), log, w, opp)
     elif verb == "work":
-        actions.work(world, agent, params["node_id"], log, w, opp)
+        actions.work(world, agent, params.get("node_id", ""), log, w, opp)
     elif verb == "eat":
         actions.eat(world, agent, log, w, opp)
     elif verb == "repair":
@@ -107,24 +115,24 @@ def apply(world: World, agent, verb: str, params: dict, rng, log, w: int = 0, op
     elif verb == "reproduce":
         actions.reproduce(world, agent, rng, log, w, opp)
     elif verb == "steal":
-        actions.steal(world, agent, params["target_id"], log, w, opp)
+        actions.steal(world, agent, params.get("target_id", ""), log, w, opp)
     elif verb == "harm":
-        actions.harm(world, agent, params["target_id"], rng, log, w, opp)
+        actions.harm(world, agent, params.get("target_id", ""), rng, log, w, opp)
     elif verb == "give":
-        actions.give(world, agent, params["target_id"],
+        actions.give(world, agent, params.get("target_id", ""),
                      params.get("resource", "food"), log, w, opp)
     elif verb == "teach":
-        actions.teach(world, agent, params["target_id"], log, w, opp)
+        actions.teach(world, agent, params.get("target_id", ""), log, w, opp)
     elif verb == "form_bond":
-        actions.form_bond(world, agent, params["target_id"], log, w, opp)
+        actions.form_bond(world, agent, params.get("target_id", ""), log, w, opp)
     elif verb == "speak":
-        actions.speak(world, agent, params["target_id"], log, w, opp)
+        actions.speak(world, agent, params.get("target_id", ""), log, w, opp)
     elif verb == "leave_message":
         actions.leave_message(world, agent, log, w, opp)
     elif verb == "move_to":
-        actions.move_to(world, agent, params["x"], params["y"], log, w, opp)
+        actions.move_to(world, agent, params.get("x", agent.x), params.get("y", agent.y), log, w, opp)
     elif verb == "coerce":
-        actions.coerce(world, agent, params["target_id"], rng, log, w, opp)
+        actions.coerce(world, agent, params.get("target_id", ""), rng, log, w, opp)
     else:
         actions.idle(world, agent, log, w, opp)
 

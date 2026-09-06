@@ -194,6 +194,15 @@ def render(world, agent, nearby_agents, nearby_nodes, brief: str = "") -> dict:
 
 # --------------------------------------------------------------------- tools
 
+def _only(tools: list, allowed) -> list:
+    """Keep the verbs that are actually possible. `idle` always survives, so the
+    model is never handed an empty tool list."""
+    if allowed is None:
+        return tools
+    keep = set(allowed) | {"idle"}
+    return [t for t in tools if t["name"] in keep]
+
+
 def _tool(name, description, properties=None, required=()):
     return {
         "name": name,
@@ -216,13 +225,19 @@ SOCIAL_VERBS = ("give", "teach", "form_bond", "speak", "steal", "harm", "coerce"
 
 
 def tool_schema(allow_violence: bool = True, has_company: bool = True,
-                can_reproduce: bool = True) -> list:
+                can_reproduce: bool = True, allowed=None) -> list:
     """The §5.5 verbs, as API tools, filtered to what is actually possible now.
 
-    Filtering is not only a cost measure. An agent should not be offered an
-    action it cannot take — the engine would reject it, the turn would be
-    wasted, and the model would have spent tokens deciding between options that
-    were never real.
+    `allowed`, when given, is the definitive set of currently-possible verbs and
+    everything else is dropped. It comes from `brain.candidates`, which already
+    evaluates every precondition to score the utility AI's options — deriving
+    the tool list from the same source means the two cannot disagree.
+
+    Filtering is not a cost measure first. An agent offered an action it cannot
+    take wastes the turn and the tokens: measured on a live run, `teach` was
+    refused 93% of the time, `speak` 53% and `give` 60%, because the prompt named
+    who was nearby but never whether they had anything to learn, or whether the
+    agent had any news to carry. A third of all paid decisions did nothing.
     """
     tools = [
         _tool("move", "Walk one step toward a place you can see.",
@@ -240,7 +255,7 @@ def tool_schema(allow_violence: bool = True, has_company: bool = True,
             "Have a child. Costs food, and you must be fed and sheltered."))
 
     if not has_company:
-        return tools
+        return _only(tools, allowed)
 
     tools += [
         _tool("give", "Hand food or wood to someone within reach.",
@@ -264,4 +279,4 @@ def tool_schema(allow_violence: bool = True, has_company: bool = True,
             _tool("coerce", "Demand food from someone within reach, under threat.",
                   {"target_id": {"type": "string"}}, ["target_id"]),
         ]
-    return tools
+    return _only(tools, allowed)

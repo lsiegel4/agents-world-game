@@ -685,6 +685,12 @@ Closed alpha of sandbox mode.
   goals should point at the world the generator now produces — recover a technique lost
   in a named era, rebuild a named ruin, hold a seat at an institution — rather than at
   a bare number.
+- **The event log is held entirely in memory**, ~100k records per 800-tick world at 120
+  agents, which exhausted RAM during the first mixed-world run. Fine for single runs;
+  fatal for M6's persistent world, which never ends. The log is already append-only and
+  replayable (§2.7), so streaming it to disk and reading it back for analysis is the
+  natural fix — and it is the same change the live spectator needs, since a viewer
+  subscribes to a stream rather than to a finished list.
 - Whether goal attainment should ever be visible to other agents, or only inferrable.
 - **Archetypes should hold biases about each other.** Currently an archetype is a
   disposition toward *verbs*; it carries no view of other kinds. Adding inter-archetype
