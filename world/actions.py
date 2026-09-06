@@ -359,6 +359,24 @@ def form_bond(world: World, agent: Agent, target_id: str, log,
     return True
 
 
+def has_news(agent: Agent):
+    """What this agent could tell someone: (claim, subject), or None.
+
+    The single definition of speak's precondition. It lived in two places — the
+    action required a grudge or favour of at least 1.0, while the utility AI
+    offered `speak` on *any* non-empty grudge or favour dict. Both decay, so
+    anything faded below 1.0 was offered forever and always refused: 48% of all
+    `speak` attempts, in the Tier 0 arm as much as the model's.
+    """
+    worst = max(agent.grudges.items(), key=lambda kv: kv[1], default=None)
+    if worst and worst[1] >= 1.0:
+        return "wronged_me", worst[0]
+    best = max(agent.favors.items(), key=lambda kv: kv[1], default=None)
+    if best and best[1] >= 1.0:
+        return "dealt_fairly", best[0]
+    return None
+
+
 def speak(world: World, agent: Agent, target_id: str, log,
           witness_count: int = 0, opp: int = 0) -> bool:
     """Tell someone something. What travels is a proposition about a third
@@ -368,14 +386,10 @@ def speak(world: World, agent: Agent, target_id: str, log,
     if other is None:
         return False
 
-    worst = max(agent.grudges.items(), key=lambda kv: kv[1], default=None)
-    if worst and worst[1] >= 1.0:
-        claim, about = "wronged_me", worst[0]
-    else:
-        best = max(agent.favors.items(), key=lambda kv: kv[1], default=None)
-        if not best or best[1] < 1.0:
-            return False
-        claim, about = "dealt_fairly", best[0]
+    news = has_news(agent)
+    if news is None:
+        return False
+    claim, about = news
 
     other.believe(claim, about, agent.id, world.tick)
     if claim == "wronged_me" and about != other.id:

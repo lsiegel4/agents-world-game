@@ -48,6 +48,7 @@ DEFAULT_CONFIG = {
     "deck": True,          # set False for the §7.3 no-deck ablation arm
     "violence": True,      # set False for the no-defection ablation arm
     "senescence": True,    # set False to let agents age without limit (§4.3 ablation)
+    "log_path": None,      # set a path to stream the event log to disk
     # Any verb named here is removed from the action space. This is the §7.3
     # ablation mechanism: run matched worlds with a verb withheld and compare.
     "disabled_verbs": (),
@@ -336,11 +337,14 @@ def run(seed: int, ticks: int, config: dict = None, mind=None):
     if config:
         cfg.update(config)
 
-    log = EventLog()
-    log.header(seed, cfg)
-    log.records[0]["deck"] = [
+    # `log_path` streams the log to disk instead of holding it in memory.
+    log = EventLog(cfg.get("log_path"))
+    # The deck's base probabilities go in the header (§7.5 threat #3: publish the
+    # deck). It has to be passed at write time — a streamed header is already on
+    # disk and cannot be edited afterwards.
+    log.header(seed, cfg, extra={"deck": [
         {"event": name, "base_p": base} for name, base, _, _ in deck.DECK
-    ]
+    ]})
     if cfg.get("worldgen") == "generated":
         from .worldgen import make_world as make_generated
         world = make_generated(seed, cfg)
@@ -376,4 +380,5 @@ def run(seed: int, ticks: int, config: dict = None, mind=None):
             break
 
     log.emit(world.tick, "indices", **indices.snapshot(world))
+    log.close()
     return world, log

@@ -6,7 +6,7 @@ scored from the agent's drive weights and its situation; the highest score wins,
 with a small seeded jitter to break ties without breaking determinism.
 """
 
-from . import archetypes, knowledge
+from . import actions, archetypes, knowledge
 
 GOAL_VERB = {"teach": "teach", "provide": "give", "lineage": "reproduce",
              "bond": "form_bond", "master": "work", "accumulate": "work",
@@ -145,11 +145,14 @@ def candidates(world: World, agent: Agent, witness_count: int = 0,
             out.append(((0.3 + 0.7 * standing) * BOND_URGE,
                         "form_bond", {"target_id": other.id}))
 
-        if agent.grudges or agent.favors:
+        # Ask the action itself whether there is anything to say, rather than
+        # keeping a second, looser copy of the rule here.
+        if actions.has_news(agent) is not None:
             out.append((SPEAK_URGE * (0.5 + 0.5 * standing),
                         "speak", {"target_id": other.id}))
 
-    if agent.grudges and not reachable(world, agent):
+    if (not reachable(world, agent)
+            and max(agent.grudges.values(), default=0.0) >= 1.0):
         out.append((MESSAGE_URGE, "leave_message", {}))
 
     if violence:
