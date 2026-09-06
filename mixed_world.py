@@ -14,6 +14,8 @@ be worth the money.
 
 import argparse
 import gc
+import os
+import tempfile
 from collections import Counter
 
 from study import scaled
@@ -66,6 +68,9 @@ def main():
     if args.mode != "replay":
         print(f"  spending real money, ceiling ${args.max_usd:.2f}\n", flush=True)
 
+    logdir = tempfile.mkdtemp(prefix="mixed-logs-")
+    print(f"  streaming event logs to {logdir}\n", flush=True)
+
     t0_idx = {k: [] for k in INDEX_KEYS}
     mx_idx = {k: [] for k in INDEX_KEYS}
     seams = crowd_mix = princ_mix = None
@@ -77,7 +82,10 @@ def main():
         # The event log lives entirely in memory — ~100k records per world at
         # this size — so each world is summarised and released before the next
         # is built. Holding all six at once is what exhausted RAM.
-        world, log = run(seed, args.ticks, scaled())
+        # Stream the log to disk: held in memory it is ~100k records per world
+        # and killed two earlier runs of this very experiment.
+        world, log = run(seed, args.ticks,
+                         scaled({"log_path": os.path.join(logdir, f"t0-{seed}.jsonl")}))
         vec = indices.vector(world, log)
         for k in INDEX_KEYS:
             t0_idx[k].append(vec[k])
@@ -86,7 +94,9 @@ def main():
 
         mind = cognition.Cognition(client=client, principals=1,
                                    on_cache_miss="error")
-        world, log = run(seed, args.ticks, scaled(), mind=mind)
+        world, log = run(seed, args.ticks,
+                         scaled({"log_path": os.path.join(logdir, f"mx-{seed}.jsonl")}),
+                         mind=mind)
         for k in INDEX_KEYS:
             mx_idx[k].append(indices.vector(world, log)[k])
 
