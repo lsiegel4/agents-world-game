@@ -12,6 +12,17 @@ from world import indices, profiles, stats
 from world.sim import run
 
 
+
+# Emergent social behaviour needs a population that reliably survives. The
+# 5-founder default is artifact-prone — it is why three findings were retracted
+# on 2026-09-04, and why every study defaults to 120 founders. Seeds 3 and 5 go
+# extinct there, so a test asserting "goals are heterogeneous" was really
+# asserting "this particular small world happened to live". Big enough to be
+# stable, small enough to stay fast.
+LIVELY = {"agents": 30, "sites": 6, "width": 48, "height": 30,
+          "food_nodes": 12, "wood_nodes": 6}
+
+
 class TestStats(unittest.TestCase):
     def test_gini_bounds(self):
         self.assertAlmostEqual(stats.gini([5, 5, 5, 5]), 0.0)
@@ -133,7 +144,7 @@ class TestKnowledge(unittest.TestCase):
 
 class TestGoals(unittest.TestCase):
     def test_every_agent_has_a_private_goal(self):
-        world, _ = run(5, 1500)
+        world, _ = run(5, 1500, LIVELY)
         for agent in world.living_agents():
             self.assertTrue(agent.goal)
             self.assertIn(agent.goal["kind"], __import__(
@@ -142,12 +153,12 @@ class TestGoals(unittest.TestCase):
     def test_goals_are_heterogeneous(self):
         """§2.1: no global objective. If every agent draws the same goal, the
         world has one in practice however the doc is worded."""
-        world, _ = run(5, 1500)
+        world, _ = run(5, 1500, LIVELY)
         kinds = {a.goal["kind"] for a in world.living_agents() if a.goal}
         self.assertGreater(len(kinds), 1)
 
     def test_revision_retains_history(self):
-        world, log = run(5, 2500)
+        world, log = run(5, 2500, LIVELY)
         revisions = [r for r in log.records if r["kind"] == "goal"]
         self.assertTrue(revisions)
         holders = [a for a in world.agents if a.goal_history]
@@ -156,18 +167,18 @@ class TestGoals(unittest.TestCase):
             self.assertIn("ended", past)
 
     def test_impossible_goals_are_abandoned_not_held(self):
-        _, log = run(5, 2500)
+        _, log = run(5, 2500, LIVELY)
         outcomes = {r["outcome"] for r in log.records if r["kind"] == "goal"}
         self.assertIn("abandoned", outcomes)
 
     def test_attainment_is_measured_over_history_not_snapshot(self):
         """A goal is revised the moment it is met, so a snapshot of the living
         reports ~0 however well the population is doing."""
-        world, log = run(5, 3000)
+        world, log = run(5, 3000, LIVELY)
         self.assertGreater(indices.goal_attainment(world), 0.0)
 
     def test_children_inherit_goal_shape_not_progress(self):
-        world, _ = run(5, 2500)
+        world, _ = run(5, 2500, LIVELY)
         by_id = {a.id: a for a in world.agents}
         checked = 0
         for agent in world.agents:
@@ -181,8 +192,9 @@ class TestGoals(unittest.TestCase):
 
     def test_goals_do_not_leak_into_another_agents_prompt(self):
         from world import prompt
-        world, _ = run(5, 1500)
+        world, _ = run(5, 1500, LIVELY)
         live = world.living_agents()
+        self.assertGreaterEqual(len(live), 2)
         me, other = live[0], live[1]
         other.goal = {"kind": "avenge", "target": "LEAK_TOKEN",
                       "threshold": 1.0, "met": False}
@@ -201,7 +213,7 @@ class TestMemoryConsolidation(unittest.TestCase):
     def test_consolidation_needs_no_model(self):
         """The control arm must not require an API key. If consolidation only
         worked with a client, Tier 0 would stop being a control."""
-        world, _ = run(5, 3000)
+        world, _ = run(5, 3000, LIVELY)
         self.assertTrue(any(a.beliefs for a in world.living_agents()))
 
     def test_beliefs_outlive_the_episodes_behind_them(self):

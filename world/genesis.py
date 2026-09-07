@@ -7,7 +7,7 @@ the tick loop has something to chew on.
 
 import random
 
-from . import archetypes
+from . import archetypes, institutions
 from .state import (
     FOOD,
     RESTRAINT_BASE,
@@ -53,6 +53,21 @@ def make_world(seed: int, config: dict) -> World:
             capacity=config["node_capacity"],
             regen_rate=config["regen_rate"],
         ))
+
+    # Two worlds in three suspect some kind; the rest are the control. Which
+    # kind is a fact about the basin, not about the archetype.
+    if rng.random() < config.get("distrust_chance", 0.66):
+        w.distrusted = (archetypes.NAMES[rng.randrange(len(archetypes.NAMES))],)
+
+    # Flat worlds have no history to inherit from, so a store appears only if
+    # one is explicitly asked for.
+    requested = config.get("granaries")
+    if requested:
+        charter = config.get("charter") or institutions.OPEN
+        for g in range(requested):
+            w.granaries.append(institutions.Granary(
+                x=(g + 1) * w.width // (config.get("granaries", 1) + 1),
+                y=w.height // 2, charter=charter))
 
     for i in range(config["agents"]):
         kind = archetypes.assign(i)

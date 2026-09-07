@@ -6,7 +6,7 @@ scored from the agent's drive weights and its situation; the highest score wins,
 with a small seeded jitter to break ties without breaking determinism.
 """
 
-from . import actions, archetypes, knowledge
+from . import actions, archetypes, institutions, knowledge, roles
 
 GOAL_VERB = {"teach": "teach", "provide": "give", "lineage": "reproduce",
              "bond": "form_bond", "master": "work", "accumulate": "work",
@@ -34,6 +34,13 @@ STEAL_URGE = 1.40
 HARM_URGE = 0.80
 GRUDGE_URGE = 0.90
 GRUDGE_FULL = 3.0
+PERSECUTION_URGE = 0.45
+ASK_URGE = 0.85
+CONTRIBUTE_URGE = 0.50
+WITHDRAW_URGE = 1.30
+ASK_HEARD_FOR = 40          # ticks an asking is remembered by those nearby
+ASK_WEIGHT = 1.60           # how much a stated need outweighs mere regard
+RELIEF_URGE = 1.10          # carrying food to someone who asked
 
 # Social urges. Kept modest on purpose: production has to stay the backbone of
 # the economy, or the M0 viability gate stops holding and every later index is
@@ -125,15 +132,24 @@ def candidates(world: World, agent: Agent, witness_count: int = 0,
 
     # --- social verbs -------------------------------------------------------
     for other in reachable(world, agent):
-        standing = max(0.0, min(1.0, agent.standing(other.id) / STANDING_FULL))
+        # Regard, not bare standing: what this kind is taken to be counts
+        # alongside what this person has actually done.
+        standing = max(0.0, min(1.0,
+                       archetypes.regard(agent, other, world.distrusted) / STANDING_FULL))
 
         # Giving: surplus, aimed at someone you regard well who is short.
+        # A stated need counts for more than regard does. Without this, giving
+        # tracks friendship and the hungry stranger is never chosen.
+        asked = (world.tick - other.asked_at) <= ASK_HEARD_FOR
+        need_weight = (1.0 + ASK_WEIGHT) if asked else 1.0
+
         spare = max(0.0, agent.has(FOOD) - SURPLUS_FOOD)
         if spare >= 1.0 and other.has(FOOD) < SURPLUS_FOOD:
             # A floor, not pure reciprocity. Scoring generosity on existing
             # standing alone is a deadlock: you need regard to give, and giving
             # is what earns regard. Nothing ever gives, so nothing ever bonds.
-            out.append((w["belonging_proxy"] * (0.35 + 0.65 * standing) * GIVE_URGE,
+            out.append((w["belonging_proxy"] * (0.35 + 0.65 * standing)
+                        * GIVE_URGE * need_weight,
                         "give", {"target_id": other.id, "resource": FOOD}))
 
         # Teaching: only if there is something this person can actually absorb.
@@ -150,6 +166,63 @@ def candidates(world: World, agent: Agent, witness_count: int = 0,
         if actions.has_news(agent) is not None:
             out.append((SPEAK_URGE * (0.5 + 0.5 * standing),
                         "speak", {"target_id": other.id}))
+
+    # --- the shared store (§5.6) ------------------------------------------
+    granary, gdist = institutions.nearest(world, agent)
+    if granary is not None:
+        if granary.within(agent):
+            if agent.has(FOOD) > SURPLUS_FOOD + 1.0:
+                out.append((w["belonging_proxy"] * CONTRIBUTE_URGE, "contribute", {}))
+            if hunger_norm > 0.35 and granary.stock > 0:
+                out.append((w["survival"] * hunger_norm * WITHDRAW_URGE,
+                            "withdraw", {}))
+        elif hunger_norm > 0.5 and granary.stock > 0:
+            out.append((w["survival"] * hunger_norm * WITHDRAW_URGE
+                        / (1.0 + 0.10 * gdist),
+                        "move_to", {"x": granary.x, "y": granary.y}))
+        elif agent.has(FOOD) > SURPLUS_FOOD + 2.0:
+            # Carrying a surplus is reason enough to walk to the store. Gating
+            # this on the store already holding something is a deadlock: nobody
+            # goes because it is empty, and it is empty because nobody goes.
+            out.append((w["belonging_proxy"] * CONTRIBUTE_URGE
+                        / (1.0 + 0.10 * gdist),
+                        "move_to", {"x": granary.x, "y": granary.y}))
+
+    # --- relief (§5.6): carrying to someone who asked ----------------------
+    #
+    # The granary failed because a plea is only heard within arm's reach and
+    # nobody travels to a stranger. A temple hears across a parish and sends
+    # someone with the food. This is the only thing in the world that moves an
+    # agent toward another agent's need rather than its own.
+    if world.pleas:
+        temple, tdist = institutions.nearest_temple(world, agent)
+        if temple is not None and temple.covers(agent):
+            carrying = agent.has(FOOD) > SURPLUS_FOOD * 0.6
+            for other in world.pleas:
+                if other is agent or other.has(FOOD) > 2.0:
+                    continue
+                d = max(abs(other.x - agent.x), abs(other.y - agent.y))
+                if d == 0:
+                    continue
+                if carrying:
+                    out.append((w["belonging_proxy"] * RELIEF_URGE
+                                / (1.0 + 0.12 * d),
+                                "move_to", {"x": other.x, "y": other.y}))
+                elif granary is not None and granary.within(agent) and granary.stock > 0:
+                    # Empty-handed at the store with someone calling: take some
+                    # to carry. Drawing for another is what a keeper does.
+                    out.append((w["belonging_proxy"] * RELIEF_URGE * 1.2,
+                                "withdraw", {}))
+
+    # Asking costs a turn and returns nothing directly, so on a bare utility
+    # comparison it always loses to working. It is worth doing when someone who
+    # could actually answer is standing there.
+    if hunger_norm > 0.4:
+        answerable = [o for o in reachable(world, agent)
+                      if o.has(FOOD) > SURPLUS_FOOD * 0.5]
+        if answerable:
+            out.append((w["survival"] * hunger_norm * ASK_URGE
+                        * (1.0 + 0.4 * len(answerable)), "ask", {}))
 
     if (not reachable(world, agent)
             and max(agent.grudges.values(), default=0.0) >= 1.0):
@@ -179,7 +252,12 @@ def candidates(world: World, agent: Agent, witness_count: int = 0,
                     out.append((take * disinhibited * (1.0 - other.vigilance),
                                 "steal", {"target_id": other.id}))
 
-                strike = w["survival"] * hunger_norm * HARM_URGE + grudge * GRUDGE_URGE
+                # Persecution: a basin's suspect is easier to strike at.
+                suspect = (PERSECUTION_URGE
+                           if other.archetype in world.distrusted
+                           and agent.archetype not in world.distrusted else 0.0)
+                strike = (w["survival"] * hunger_norm * HARM_URGE
+                          + grudge * GRUDGE_URGE + suspect)
                 out.append((strike * disinhibited, "harm", {"target_id": other.id}))
 
                 # Coercion is the cheaper cousin of theft: no blow, but it only
@@ -192,6 +270,16 @@ def candidates(world: World, agent: Agent, witness_count: int = 0,
 
     out.append((0.05, "idle", {}))
     out = [c for c in out if c[1] not in disabled]
+
+    # A role changes what is possible and tilts toward its own work (§5.7).
+    # A keeper cannot work the ground at all, which is what makes it depend on
+    # the store rather than merely prefer it.
+    if agent.role:
+        forbidden = roles.blocked(agent.role)
+        out = [c for c in out if c[1] not in forbidden]
+        obliged = roles.duty(agent.role)
+        out = [(u + roles.DUTY_WEIGHT if verb in obliged else u, verb, params)
+               for u, verb, params in out]
 
     # Archetype affinity: the verbs this kind of person reaches for first. This
     # is what makes an archetype visible in behaviour rather than only in its

@@ -43,7 +43,7 @@ No dependencies. Python 3.9+.
 | `world/worldgen.py` | §4.1 passes 7-9 and assembly of all nine |
 | `world/memory.py` | Episodic memory: salience, decay, ranked recall (§5.4) |
 | `world/prompt.py` | State -> prompt rendering and the API tool schema (§5.2) |
-| `world/cognition.py` | Stakes scoring, tier routing, model-driven action choice (§5.7) |
+| `world/cognition.py` | Stakes scoring, tier routing, model-driven action choice (§5.8) |
 | `world/llm.py` | Model client: record/replay cache, cost accounting, spend guard |
 | `world/sim.py` | Tick loop, drive dynamics, starvation |
 | `world/log.py` | Append-only JSONL event log, SHA-256 digest |
@@ -394,7 +394,7 @@ the report warns when any fired.
 ```
 
 The first version of the stakes function escalated on **63%** of ticks, which violates
-§5.7's "most ticks are not model calls" and would run roughly $1,400/month for a
+§5.8's "most ticks are not model calls" and would run roughly $1,400/month for a
 200-agent shared world. The cause was that any nearby agent added a flat +0.30, and
 agents cluster at resource nodes constantly. Proximity on its own is not a decision; it
 matters when something is at stake — an unsettled grudge, or a hungry agent standing next
@@ -929,3 +929,118 @@ cost    $0.00246 -> $0.00149          (39%)
 
 The model still writes a short preamble. Since removing deliberation may change *what* it
 chooses and not only how much it says, halving it is the safer trade.
+
+
+## Persecution (2026-09-05)
+
+An archetype was a disposition toward verbs and held no view of other kinds. That is why
+one strategy won in all six world conditions measured: every condition varied *resources*,
+and nothing made knowing things costly.
+
+Two layers of regard. **Structural** tension is the same everywhere — a zealot resents a
+scholar (certainty against inquiry), a steward distrusts a broker (one mends, the other
+prices the mending), artisan and scholar warm to each other. On top of it, **each basin
+distrusts a kind**, and which kind is a fact about the world rather than the archetype: in
+generated worlds it follows the history, so a collapse or plague blames the scholar for
+failing to prevent it, a conflict blames the zealot for starting it, a famine blames the
+broker. A third of flat worlds suspect nobody — the control.
+
+No new verb. Being distrusted means fewer gifts, refused bonds, less teaching, and a
+higher chance of being struck. Personal history still dominates: someone who has fed you
+outweighs what people say about their sort.
+
+### It closes the §2.1 violation
+
+```
+mean survival share when distrusted : 0.038
+mean survival share when trusted    : 0.186     (~5x penalty)
+
+winner by world: scholar 8, artisan 2           (was scholar in 6 of 6)
+```
+
+The decisive case is the world where scholars are the suspect kind: their share falls from
+the usual ~55% to **0.018** and the artisan takes the basin. The scholar is still a strong
+strategy — it wins where it is not distrusted — but "one strategy wins regardless of the
+world" is now false, which is what §2.1 forbids.
+
+### A world dies of distrust, not of violence
+
+Persecution costs a world about 38% of its population. Splitting it:
+
+```
+neither (baseline)                 pop 67.5
+violence only (no exclusion)       pop 67.0    costs almost nothing
+exclusion only (no extra violence) pop 54.3    -20%
+persecution as built               pop 41.8    -38%
+```
+
+**The killing is nearly free; the refusal to cooperate is what kills.** Distrust suppresses
+giving, teaching and bonding, and since teaching is the strongest lever in the project,
+cutting transmission through suspicion is what ends a basin. A world that cannot cooperate
+cannot absorb a bad season.
+
+### The test this broke
+
+`test_generated_worlds_remain_viable` asserted no generated world ever goes extinct. That
+was only true while the sole cause of extinction was a bug — biome quality silently
+shrinking the economy. Extinction now has a legitimate cause, and at the 5-founder default
+losing one archetype to distrust looks like collapse.
+
+Rewritten as a comparison — generated against flat, with distrust switched off so the
+generator is what is under test. Second time today a failing test turned out to encode a
+stale assumption rather than catch a regression. **Tests that assert "this never happens"
+age badly once the world gains the ability to make it happen legitimately.**
+
+
+## The granary, and why it failed (2026-09-05)
+
+Starvation was diagnosed as a distribution failure: 42% of all deaths, 75% of them with
+2.24 neighbours carrying food within three tiles, while 1,600 units sat in the basin.
+Three things were missing — nowhere to hold a surplus for anyone else (`MAX_CARRY` is 12),
+no way to signal need, and institutions that held nothing.
+
+`world/institutions.py` adds a **granary**: a place holding food nobody is carrying, and
+a rule about who may take it. Three charters — `open` (anyone hungry), `members` (only
+contributors), `kindred` (contributors, excluding the basin's suspect kind). The charter
+is where politics lives, and it is a variable rather than a constant.
+
+Plus two verbs: **`ask`**, which makes hunger legible (giving followed *standing*, so food
+moved along friendship and a starving stranger was invisible to the rule), and
+**`contribute`/`withdraw`**.
+
+### It does not work
+
+```
+granaries     pop  starved %    stock   taken
+0            36.0     59.4%      0.0     0.0
+1            37.0     57.3%    145.3     1.2
+4            37.2     55.4%    397.1     7.8
+12           38.8     55.6%    580.9    42.7
+```
+
+Starvation moves 59.4% -> 55.6%. **Twelve granaries are no better than four** — the
+prediction that density would fix it was wrong. All that changes is how much piles up:
+**580 units sitting in stores while 55.6% of deaths are starvation.**
+
+The granary became a hoard. Contributing is easy: a surplus agent walks over and drops
+food. Withdrawing requires a *starving* agent to be standing at the store, and the people
+who die are exactly those far from both food nodes and stores. A hungry agent beside a
+node works it; one stranded between everything dies between everything.
+
+**Distribution failure here is about attention, not storage.** More warehouses cannot fix
+a problem where nobody carries anything to anyone. The store is a prerequisite — you need
+somewhere to draw from — but what would save lives is an agent whose role is to carry: the
+temple, drawing on another's behalf. That is also the only thing that would make `ask`
+mean anything, since agents currently ask ~1,300 times a run and it changes only who a
+nearby giver happens to choose.
+
+### Two silent-edit lessons
+
+The granary block was written into `brain.py` and **did nothing** — the anchor text it was
+inserted against had been rewritten by an earlier fix, so `.replace()` matched nothing and
+failed quietly. Nothing errored; the feature simply was not there. Edits now assert their
+anchor exists before writing.
+
+And `worldgen.py` assigned `institutions = generate_institutions(...)`, shadowing the
+module of the same name — the "two unrelated things both called institutions" problem
+colliding in the namespace. The lore list is now `chartered`.

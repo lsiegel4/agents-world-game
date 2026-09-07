@@ -75,6 +75,54 @@ ARCHETYPES = {
 
 NAMES = tuple(sorted(ARCHETYPES))
 
+# --- Inter-archetype regard (§12) -------------------------------------------
+#
+# An archetype was a disposition toward verbs and carried no view of other
+# kinds. That is why one strategy won in all six world conditions measured:
+# every condition varied *resources*, and nothing in the world made knowing
+# things costly. Scholars went from 17% of founders to 55-62% of survivors
+# regardless of scarcity, abundance, disruption or crowding.
+#
+# Two layers. STRUCTURAL is the standing tension between kinds and is the same
+# in every world — a steward distrusts a broker anywhere. The distrusted
+# archetype is drawn per world from its own history, so which kind is suspect
+# is a fact about the basin, not about the archetype. A world that persecutes
+# the wise is the condition that dethrones the scholar.
+STRUCTURAL = {
+    ("steward", "broker"): -0.6,     # one mends, the other prices the mending
+    ("steward", "zealot"): -0.4,
+    ("broker", "steward"): -0.3,
+    ("zealot", "scholar"): -0.7,     # certainty resents inquiry
+    ("scholar", "zealot"): -0.5,
+    ("artisan", "broker"): -0.4,
+    ("wanderer", "steward"): -0.3,   # the settled distrust the rootless, and back
+    ("steward", "wanderer"): -0.4,
+    ("artisan", "scholar"): 0.3,     # both make things that outlast them
+    ("scholar", "artisan"): 0.3,
+    ("steward", "artisan"): 0.3,
+}
+
+DISTRUST_PENALTY = 1.2               # how much a whole basin's suspicion weighs
+
+
+def bias(observer: str, subject: str, distrusted=()) -> float:
+    """How `observer`'s kind regards `subject`'s kind in this world."""
+    value = STRUCTURAL.get((observer, subject), 0.0)
+    if subject in distrusted and observer != subject:
+        value -= DISTRUST_PENALTY
+    return value
+
+
+def regard(observer, other, distrusted=()) -> float:
+    """Net regard: personal history plus what their kind is taken to be.
+
+    Personal dealings still dominate — someone who has fed you outweighs what
+    people say about their sort — but a distrusted kind starts in a hole and has
+    to climb out of it.
+    """
+    return observer.standing(other.id) + bias(observer.archetype,
+                                              other.archetype, distrusted)
+
 
 def spec(name: str) -> dict:
     return ARCHETYPES.get(name, ARCHETYPES["artisan"])

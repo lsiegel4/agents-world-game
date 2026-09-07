@@ -6,7 +6,7 @@ repair is the smallest set that produces a non-degenerate economy — two
 non-fungible resources at different places, both of them needed.
 """
 
-from . import archetypes, goals, knowledge
+from . import archetypes, goals, institutions, knowledge
 from .genesis import NAMES
 from .state import (
     BOND_RADIUS,
@@ -30,6 +30,7 @@ from .state import (
     REPRO_FOOD_COST,
     RESTRAINT_INHERIT_NOISE,
     SHELTER_PER_WOOD,
+    STARVATION_THRESHOLD,
     STEAL_AMOUNT,
     VICTIM_RESTRAINT_LOSS,
     VIGILANCE_PER_WITNESS,
@@ -347,7 +348,7 @@ def form_bond(world: World, agent: Agent, target_id: str, log,
 
     # Some positive history is required, but not much — a bond is how a tie
     # starts, not a reward for one already being strong.
-    accepted = other.standing(agent.id) >= 0.25
+    accepted = archetypes.regard(other, agent, world.distrusted) >= 0.25
     if accepted:
         agent.bonds.add(other.id)
         other.bonds.add(agent.id)
@@ -446,6 +447,56 @@ def coerce(world: World, agent: Agent, target_id: str, rng, log,
 
     log.emit(world.tick, "action", agent=agent.id, verb="coerce", target=target_id,
              yielded=yielded, witnesses=len(seen), observed=bool(seen),
+             w=witness_count, opp=opp)
+    return True
+
+
+def ask(world: World, agent: Agent, log,
+        witness_count: int = 0, opp: int = 0) -> bool:
+    """Say you are hungry.
+
+    Giving followed *standing* — who had been good to you — so food moved along
+    friendship and a starving stranger was invisible to the rule. This makes
+    need legible. It costs nothing but the turn, and it is the only way a
+    stranger enters anyone's calculation.
+    """
+    if agent.hunger < STARVATION_THRESHOLD * 0.4:
+        return False
+    agent.asked_at = world.tick
+    log.emit(world.tick, "action", agent=agent.id, verb="ask",
+             hunger=round(agent.hunger, 1), w=witness_count, opp=opp)
+    return True
+
+
+def contribute(world: World, agent: Agent, log,
+               witness_count: int = 0, opp: int = 0) -> bool:
+    """Put food into the shared store."""
+    granary, dist = institutions.nearest(world, agent)
+    if granary is None or not granary.within(agent):
+        return False
+    given = granary.contribute(agent, institutions.CONTRIBUTE_AMOUNT)
+    if given <= 0:
+        return False
+    log.emit(world.tick, "action", agent=agent.id, verb="contribute",
+             amount=round(given, 2), stock=round(granary.stock, 1),
+             w=witness_count, opp=opp)
+    return True
+
+
+def withdraw(world: World, agent: Agent, log,
+             witness_count: int = 0, opp: int = 0) -> bool:
+    """Take food from the shared store, if the charter allows it."""
+    granary, dist = institutions.nearest(world, agent)
+    if granary is None or not granary.within(agent):
+        return False
+    taken = granary.withdraw(agent, institutions.WITHDRAW_AMOUNT, world.distrusted)
+    if taken <= 0:
+        log.emit(world.tick, "action", agent=agent.id, verb="withdraw",
+                 amount=0.0, refused=True, charter=granary.charter,
+                 w=witness_count, opp=opp)
+        return True
+    log.emit(world.tick, "action", agent=agent.id, verb="withdraw",
+             amount=round(taken, 2), stock=round(granary.stock, 1),
              w=witness_count, opp=opp)
     return True
 

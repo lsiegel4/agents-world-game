@@ -304,7 +304,135 @@ required:
 - **Retaliation and sanction.** Both individual (trust collapse, counter-harm) and
   collective (institutions can exclude). Sanction is what makes a norm a norm.
 
-### 5.7 Cognition tiers and cost routing
+### 5.7 Roles — the division of labour
+
+**Status: designed, not built (2026-09-06).**
+
+An archetype is *who someone is*. A role is *what they do all day*, and the world
+currently has no such thing. The six archetypes tilt utilities — a scholar has
+`teach` affinity 1.7 — but every agent still forages, eats, repairs, bonds and
+reproduces. Everyone is a generalist with a lean. §7.3 measures a
+`specialization_index` from action entropy, but nothing in the world *produces*
+specialization; it only records agents who happened to do one thing more often.
+
+The gap surfaced when the temple failed. Relief works — food moved out of the
+store doubled — but starvation did not fall and population dropped, because
+every agent occasionally abandoned foraging to carry food to a stranger. The
+cost was spread across the whole population. A temple is not everyone helping
+sometimes; it is a few people who do nothing else, fed by everyone else's
+surplus.
+
+#### What a role is, mechanically
+
+Three things, and the third is the one that matters:
+
+1. **It changes the action space.** A keeper is not offered `work`; a farmer is
+   not offered `teach`. This reuses the affordance filtering already built for
+   the tool schema, which derives from `brain.candidates` — a role is another
+   input to what is possible, not a parallel system.
+2. **It carries a duty.** The role's verb is weighted heavily: a keeper's
+   relief, a teacher's teaching. Not compulsory — an agent under enough hunger
+   still acts for itself, and that tension is worth being able to observe.
+3. **It redirects sustenance.** A role-holder does not feed itself from the
+   ground. It draws from the institution that supports it. **This is the whole
+   point.** It creates dependency, which the world entirely lacks: a keeper who
+   is not fed dies, and a basin that cannot sustain its specialists loses them.
+
+#### Roles are held, not owned
+
+| | archetype | role |
+|---|---|---|
+| origin | born with it (nature, §5.6) | taken up |
+| changes | never | can be taken and lost |
+| inherited | yes, with drift | no |
+| effect | tilts utility | changes the action space and what feeds you |
+| requires | nothing | an institution with capacity |
+
+An agent can hold one role or none. Most hold none — a world of nothing but
+specialists starves, because somebody has to work the ground.
+
+#### Institutions support roles, roles serve institutions
+
+This is what finally gives the chartered institutions from §4.1 pass 7 something
+to *be*. They have had a kind, a charter and a seat since M3 and nothing read
+them until the granary.
+
+| institution | role | duty | fed by |
+|---|---|---|---|
+| granary | farmer | works nodes, contributes surplus | own harvest, kept low |
+| temple | keeper | carries relief to whoever asked | the granary |
+| school | teacher | teaches rather than forages | the granary |
+| watch | watchman | patrols nodes, reduces degradation | the granary |
+| market | broker | brokers exchange between strangers | a cut of what passes |
+| council | elder | resolves grudges, applies sanction (§5.6) | the granary |
+
+Capacity is set by what the institution holds: a granary with a thin store
+supports one keeper, a full one supports several. That makes specialization
+something prosperity **buys**, which is the causal link §7.1 is missing — the
+indices currently read progress without progress changing what is possible.
+
+#### Archetype x role is where diversity comes from
+
+The two layers multiply. A steward-keeper and a zealot-keeper hold the same
+office and do it differently: the zealot's persecution affinity means it will
+pass over a distrusted asker; the steward will not. Six archetypes across six
+roles is thirty-six kinds of life, from two small tables.
+
+Archetype also biases *who takes which office* — a scholar drawn to teaching, a
+steward to keeping, a broker to the market. Not a restriction: an unlikely
+match is more interesting than an impossible one, and a basin whose only
+literate survivor is a zealot will have a zealot for a teacher.
+
+#### Failure, and why it is the interesting part
+
+A role must be losable, and losing it must hurt.
+
+- **The institution empties.** A granary that runs dry cannot feed its keepers.
+  They revert to generalists — behind on foraging, holding no techniques for it,
+  and likely to die.
+- **The institution is destroyed.** A collapse era in the present, not just in
+  the generated past.
+- **The holder dies.** The office stands vacant until someone takes it, and the
+  world runs without relief in the meantime.
+
+That produces a failure mode the world does not currently have: not gradual
+starvation, but the **loss of a capability**, which is sharper and more legible
+in a chronicle. "The last keeper died in the Hungry Years and nobody took the
+office" is a sentence the narrative layer could not previously produce.
+
+#### What this changes in measurement
+
+- `specialization_index` should read role-holding, not action entropy. The
+  current definition was a proxy for something that did not exist.
+- A new index — **division of labour**: what fraction of the living hold a role,
+  and how many distinct roles are filled. A world sustaining five offices is
+  further along than one sustaining none, and this is a *level* whose changes
+  over time give §7.1 the trajectory it lacks.
+- Roles make §7.6's value lock-in test sharper: do the children of keepers
+  become keepers?
+
+#### Risks, stated before building
+
+- **Viability.** Specialists do not forage. If institutions fail faster than
+  roles can be shed, roles could kill worlds the way the granary killed small
+  ones. Build behind a config switch and ablate.
+- **A dominant role**, as scholars dominated archetypes. If everyone becomes a
+  farmer the world is unchanged; if everyone becomes a keeper it starves.
+  Capacity limits should prevent it, but it must be measured, not assumed.
+- **A third layer.** Archetype, role and goal now all shape behaviour. Each is
+  cheap alone; together they are a large tuning surface, and the project's
+  recurring bug has been two places encoding one rule and drifting apart.
+- **Cost.** Roles enter the prompt and the tool schema, so any role change
+  orphans the response cache.
+
+#### Build order
+
+Keeper and farmer first, as a matched pair against the granary and temple that
+already exist — farmers fill the store, keepers empty it, neither does both.
+That is the narrowest cut that tests the whole idea, and it is aimed at the one
+mechanism already measured to fail for a known reason.
+
+### 5.8 Cognition tiers and cost routing
 
 The largest cost lever in the system, roughly 10–50x.
 
@@ -692,6 +820,31 @@ Closed alpha of sandbox mode.
   natural fix — and it is the same change the live spectator needs, since a viewer
   subscribes to a stream rather than to a finished list.
 - Whether goal attainment should ever be visible to other agents, or only inferrable.
+- **Prosperity should unlock capability, not just raise a reading.** §7.1 measures
+  progress as a vector of indices, but those are readings with no consequences: a basin at
+  knowledge depth 6 has exactly the same possibilities as one at depth 2. There is no
+  ratchet, so a world cannot *evolve* when it does well.
+
+  The mechanism also joins two things currently both called "institutions" and never
+  connected — the chartered ones generated from history (§4.1 pass 7), which nothing
+  reads, and the bond-graph components that `institution_density` counts. **A bond group
+  holding a persistent surplus founds a chartered institution.** History seeds the world;
+  the present earns more.
+
+  What a basin earns should follow its condition, so that identical starting points
+  diverge: surplus with knowledge founds a *school* (faster ambient learning); surplus
+  with violence founds a *watch* (less predation nearby); surplus with inequality founds a
+  *market* (trade at a rate, rather than gifts by standing); surplus with many deaths
+  founds a *temple* (draws from the granary on behalf of others — the first institution
+  that acts for someone else); disputes found a *council*, which is where §5.6's missing
+  collective sanction would live; a depleted commons founds *stewardship*.
+
+  It must also be losable. Collapse, famine and persecution should be able to take an
+  institution down, or progress is a ratchet that only turns one way and the generated
+  history's Collapse and Scattering eras have no present-tense equivalent. That gives
+  §7.1 a trajectory rather than a level: two worlds at the same depth are not the same
+  world if one is climbing and the other is losing what it had.
+
 - **Archetypes should hold biases about each other.** Currently an archetype is a
   disposition toward *verbs*; it carries no view of other kinds. Adding inter-archetype
   regard — a steward who distrusts brokers, a zealot who will not be taught by a scholar,

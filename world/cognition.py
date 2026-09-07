@@ -1,4 +1,4 @@
-"""Tier routing and model-driven action selection — DESIGN.md §5.7.
+"""Tier routing and model-driven action selection — DESIGN.md §5.8.
 
 Most ticks are not model calls. Tier 0 is the utility AI in brain.py and handles
 routine life; escalation is triggered by a novelty/stakes score, not by a tick
@@ -14,8 +14,8 @@ in the engine — authority is the tool schema's, not the text's (§2.5).
 from . import brain, prompt
 from .state import FOOD, MAX_CARRY, STARVATION_THRESHOLD
 
-TIER1_MODEL = "claude-haiku-4-5"    # §5.7 cheap tier
-TIER2_MODEL = "claude-opus-5"       # §5.7 frontier tier
+TIER1_MODEL = "claude-haiku-4-5"    # §5.8 cheap tier
+TIER2_MODEL = "claude-opus-5"       # §5.8 frontier tier
 ESCALATE_T1 = 0.35
 ESCALATE_T2 = 0.80
 MAX_TOKENS = 512

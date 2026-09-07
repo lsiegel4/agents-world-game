@@ -6,7 +6,7 @@ randomness; agents are always processed in list order.
 
 import random
 
-from . import actions, archetypes, deck, goals, indices, knowledge
+from . import actions, archetypes, deck, goals, indices, institutions, knowledge, roles
 from .memory import Memory
 from .genesis import BASELINE_DRIVES, make_world
 from .log import EventLog
@@ -49,6 +49,16 @@ DEFAULT_CONFIG = {
     "violence": True,      # set False for the no-defection ablation arm
     "senescence": True,    # set False to let agents age without limit (§4.3 ablation)
     "log_path": None,      # set a path to stream the event log to disk
+    # None = the world's history decides (a market, moot or council implies a
+    # common store). An integer forces the count; 0 is the ablation arm.
+    #
+    # A granary *alone* makes worlds worse — food goes in and does not come out,
+    # and at 5 founders seed 11 goes extinct with one and survives without. It
+    # is only worth having alongside a temple, which carries food back out.
+    "granaries": None,
+    "charter": None,       # open | members | kindred; None = chosen by the world
+    "temples": None,       # None = the world's history decides; an integer forces it
+    "roles": True,         # §5.7 division of labour; False is the ablation arm
     # Any verb named here is removed from the action space. This is the §7.3
     # ablation mechanism: run matched worlds with a verb withheld and compare.
     "disabled_verbs": (),
@@ -132,6 +142,12 @@ def apply(world: World, agent, verb: str, params: dict, rng, log,
         actions.leave_message(world, agent, log, w, opp)
     elif verb == "move_to":
         actions.move_to(world, agent, params.get("x", agent.x), params.get("y", agent.y), log, w, opp)
+    elif verb == "ask":
+        actions.ask(world, agent, log, w, opp)
+    elif verb == "contribute":
+        actions.contribute(world, agent, log, w, opp)
+    elif verb == "withdraw":
+        actions.withdraw(world, agent, log, w, opp)
     elif verb == "coerce":
         actions.coerce(world, agent, params.get("target_id", ""), rng, log, w, opp)
     else:
@@ -218,6 +234,10 @@ def step(world: World, rng, log, deck_rng=None, cfg=None, mind=None,
     violence = bool(cfg.get("violence", True)) if cfg else True
     # Computed once per tick: what the basin as a whole knows how to do.
     common = knowledge.prevalence(world.living_agents())
+    # Open pleas a temple can hear, computed once per tick. Doing it inside
+    # brain.candidates would be O(agents^2 x temples) every tick.
+    world.pleas = (institutions.live_pleas(world, world.tick)
+                   if world.temples else [])
     disabled = frozenset(cfg.get("disabled_verbs", ())) if cfg else frozenset()
 
     for agent in world.living_agents():
@@ -310,6 +330,15 @@ def step(world: World, rng, log, deck_rng=None, cfg=None, mind=None,
 
     for node in world.nodes:
         node.regenerate()
+
+    if cfg is None or cfg.get("roles", True):
+        roles.sustain(world, log)
+        roles.vacate_if_unsupported(world, log)
+        if world.tick % roles.APPOINT_EVERY == 0:
+            roles.appoint(world, rng, log)
+
+    for granary in world.granaries:
+        granary.spoil()
 
     world.messages = [m for m in world.messages
                       if world.tick - m["tick"] <= MESSAGE_TTL]

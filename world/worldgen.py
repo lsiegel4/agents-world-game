@@ -12,7 +12,7 @@ discipline that separate PRNG streams enforce elsewhere.
 
 import random
 
-from . import archetypes
+from . import archetypes, institutions
 from . import history as history_pass
 from . import terrain as terrain_pass
 from .state import FOOD, WOOD, Agent, ResourceNode, World
@@ -110,17 +110,56 @@ def make_world(seed: int, config: dict) -> World:
     hist = history_pass.generate_history(sites, rng, config.get("history_seasons", 600))
     culture = history_pass.generate_culture(hist, rng)
     myths = history_pass.generate_myth(hist, rng)
-    institutions = generate_institutions(hist, rng)
+    chartered = generate_institutions(hist, rng)   # lore; see institutions.py
     material = generate_material_state(hist, sites, rng,
                                        config.get("inequality", 0.5))
 
     world = World(width=config["width"], height=config["height"])
     world.nodes = place_nodes(grid, rng, config["food_nodes"], config["wood_nodes"],
                               config["node_capacity"], config["regen_rate"])
+    # Who a basin blames follows its history. A collapse or a plague wants
+    # someone to have failed to prevent it; a conflict wants someone to have
+    # started it. §4.1's history reaching into the fitness landscape rather
+    # than only into flavour.
+    blamed_by_era = {"collapse": "scholar", "plague": "scholar",
+                     "famine": "broker", "conflict": "zealot",
+                     "schism": "zealot", "reckoning": "broker",
+                     "flood": "steward", "isolation": "wanderer"}
+    for era in reversed(hist["eras"]):
+        if era["kind"] in blamed_by_era:
+            world.distrusted = (blamed_by_era[era["kind"]],)
+            break
+
+    # A store sits where people already gather. The charter follows the basin's
+    # temperament: a world that suspects a kind writes that into who may eat.
+    # Institutions a basin already has are the ones its history built. The
+    # chartered list from pass 7 has existed since M3 and nothing read it; this
+    # is where it becomes real. A world that survived a plague has a temple
+    # because it built one then; a world that never did, has not.
+    charter = config.get("charter")
+    if charter is None:
+        charter = institutions.KINDRED if world.distrusted else institutions.OPEN
+
+    kinds = {i["kind"] for i in chartered if i["active"]}
+    seats = {i["kind"]: i["seat"] for i in chartered}
+
+    # A market or a moot implies somewhere to put a common store.
+    wanted = config.get("granaries")
+    wanted = 2 if wanted is None else wanted
+    if wanted and kinds & {"market", "moot", "council"}:
+        for _, sx, sy in sites[:wanted]:
+            world.granaries.append(institutions.Granary(sx, sy, charter,
+                                                        seat=seats.get("market", "")))
+    forced = config.get("temples")
+    if forced is None:
+        forced = 1 if "temple" in kinds else 0
+    for _, tx, ty in sites[:forced]:
+        world.temples.append(institutions.Temple(tx, ty, seat=seats.get("temple", "")))
+
     world.terrain = grid
     world.lore = {"sites": sites, "ruins": ruin_list, "history": hist,
                   "culture": culture, "myths": myths,
-                  "institutions": institutions, "material": material,
+                  "institutions": chartered, "material": material,
                   "myth_divergence": history_pass.myth_divergence(hist, myths)}
 
     # Pass 9: placement. Endowment follows the site an agent is born into, so

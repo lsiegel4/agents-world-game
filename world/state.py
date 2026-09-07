@@ -166,6 +166,7 @@ class Agent:
     alive: bool = True
     cause_of_death: str = ""
     archetype: str = "artisan"                    # §6.1; engine-owned, never user-set
+    role: str = ""                                # §5.7; an office, held not owned
     parent: str = ""
     generation: int = 0
     last_birth: int = -10**6
@@ -173,6 +174,7 @@ class Agent:
     restraint_base: float = RESTRAINT_BASE
     grudges: dict = field(default_factory=dict)   # agent_id -> accumulated offence
     vigilance: float = 0.0                        # watchfulness; see §2.1 note above
+    asked_at: int = -10**6                        # last tick this agent said it was hungry
     memory: object = None                         # world.memory.Memory, lazily attached
     goal: dict = field(default_factory=dict)      # private; never in another agent's view
     goal_history: list = field(default_factory=list)   # every goal held, in order
@@ -227,6 +229,10 @@ class World:
     tick: int = 0
     last_disaster: int = 0
     messages: list = field(default_factory=list)  # [{x, y, claim, about, by, tick}]
+    distrusted: tuple = ()                        # archetypes this basin suspects
+    granaries: list = field(default_factory=list) # shared stores; see institutions.py
+    temples: list = field(default_factory=list)   # institutions that act for others
+    pleas: list = field(default_factory=list)     # agents heard asking, this tick
     terrain: list = field(default_factory=list)   # [height][width] biome grid, M3 only
     lore: dict = field(default_factory=dict)      # §4.1 generation output, M3 only
 
